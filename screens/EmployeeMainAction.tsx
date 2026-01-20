@@ -14,6 +14,16 @@ const EmployeeMainAction: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const userRef = useRef<any>(null);
+  const sessionRef = useRef<WorkSession | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    sessionRef.current = currentSession;
+  }, [currentSession]);
 
   useEffect(() => {
     const init = async () => {
@@ -58,13 +68,78 @@ const EmployeeMainAction: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-        scannerRef.current.clear().catch(() => {});
+    if (!scanning) return;
+    if (!qrToken) {
+      setScanError('QR no configurado. Contacta con el administrador.');
+      setScanning(false);
+      return;
+    }
+
+    let cancelled = false;
+    const scanner = new Html5Qrcode('qr-reader');
+    scannerRef.current = scanner;
+    setScanError(null);
+
+    const start = async () => {
+      try {
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: 240 },
+          async (decodedText) => {
+            if (cancelled) return;
+            const scannedToken = extractToken(decodedText);
+            if (scannedToken !== qrToken) {
+              setScanError('QR incorrecto. Usa el QR del local.');
+              return;
+            }
+
+            await stopScanner();
+            setScanning(false);
+
+            const activeUser = userRef.current;
+            if (!activeUser) return;
+            try {
+              const activeSession = sessionRef.current;
+              if (activeSession) {
+                await supabaseService.clockOut(activeSession.id);
+                setCurrentSession(null);
+                navigate('/clock-confirm', { state: { type: 'OUT' } });
+              } else {
+                const session = await supabaseService.clockIn(activeUser.id);
+                setCurrentSession(session);
+                navigate('/clock-confirm', { state: { type: 'IN' } });
+              }
+            } catch (error) {
+              console.error('Error al fichar:', error);
+              alert('Error al registrar: Asegurate de tener conexion.');
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Error starting scanner:', error);
+        setScanError('No se pudo iniciar la camara.');
+        setScanning(false);
+        await stopScanner();
       }
     };
-  }, []);
+
+    const stopScanner = async () => {
+      if (!scannerRef.current) return;
+      try {
+        await scannerRef.current.stop();
+        await scannerRef.current.clear();
+      } catch {
+        // ignore
+      }
+    };
+
+    start();
+
+    return () => {
+      cancelled = true;
+      stopScanner();
+    };
+  }, [scanning, qrToken, navigate]);
 
   const extractToken = (payload: string) => {
     try {
@@ -79,68 +154,9 @@ const EmployeeMainAction: React.FC = () => {
     return payload;
   };
 
-  const stopScanner = async () => {
-    if (!scannerRef.current) return;
-    try {
-      await scannerRef.current.stop();
-      await scannerRef.current.clear();
-    } catch {
-      // ignore
-    }
-  };
-
-  const startScanner = async () => {
-    if (!qrToken) {
-      setScanError('QR no configurado. Contacta con el administrador.');
-      return;
-    }
-    setScanError(null);
-    setScanning(true);
-    const scanner = new Html5Qrcode('qr-reader');
-    scannerRef.current = scanner;
-
-    try {
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: 240 },
-        async (decodedText) => {
-          const scannedToken = extractToken(decodedText);
-          if (scannedToken !== qrToken) {
-            setScanError('QR incorrecto. Usa el QR del local.');
-            return;
-          }
-
-          await stopScanner();
-          setScanning(false);
-
-          if (!user) return;
-          try {
-            if (currentSession) {
-              await supabaseService.clockOut(currentSession.id);
-              setCurrentSession(null);
-              navigate('/clock-confirm', { state: { type: 'OUT' } });
-            } else {
-              const session = await supabaseService.clockIn(user.id);
-              setCurrentSession(session);
-              navigate('/clock-confirm', { state: { type: 'IN' } });
-            }
-          } catch (error) {
-            console.error('Error al fichar:', error);
-            alert('Error al registrar: Asegurate de tener conexion.');
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Error starting scanner:', error);
-      setScanError('No se pudo iniciar la camara.');
-      setScanning(false);
-      await stopScanner();
-    }
-  };
-
   const handleClockAction = async () => {
     if (!user) return;
-    await startScanner();
+    setScanning(true);
   };
 
   if (loading) return null;
@@ -204,10 +220,7 @@ const EmployeeMainAction: React.FC = () => {
             <div className="text-center font-black text-sm uppercase tracking-widest text-gray-500 mb-3">Escanear QR</div>
             <div id="qr-reader" className="w-full overflow-hidden rounded-2xl"></div>
             <button
-              onClick={async () => {
-                await stopScanner();
-                setScanning(false);
-              }}
+              onClick={() => setScanning(false)}
               className="mt-4 w-full py-3 rounded-2xl bg-gray-100 font-black text-xs uppercase tracking-widest"
             >
               Cancelar
