@@ -12,6 +12,7 @@ type SessionRow = {
   user_id: string;
   clock_in: string;
   clock_out: string | null;
+  location_id?: string | null;
 };
 
 type SessionEdit = SessionRow & {
@@ -37,6 +38,7 @@ const AdminSessions: React.FC = () => {
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -59,16 +61,32 @@ const AdminSessions: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
-        await Promise.all([
-          supabase.from('employees').select('id, name'),
-          supabase
-            .from('sessions')
-            .select('id, user_id, clock_in, clock_out')
-            .gte('clock_in', rangeStart.toISOString())
-            .lte('clock_in', rangeEnd.toISOString())
-            .order('clock_in', { ascending: false })
-        ]);
+        const { data: settings } = await supabase
+          .from('app_settings')
+          .select('selected_location_id')
+          .eq('id', 1)
+          .maybeSingle();
+        const selectedLocation = settings?.selected_location_id || null;
+        setActiveLocationId(selectedLocation);
+
+        if (!selectedLocation) {
+          setSessions([]);
+          setEmployees([]);
+          setLoading(false);
+          return;
+        }
+
+        const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
+          await Promise.all([
+            supabase.from('employees').select('id, name').eq('location_id', selectedLocation),
+            supabase
+              .from('sessions')
+              .select('id, user_id, clock_in, clock_out, location_id')
+              .gte('clock_in', rangeStart.toISOString())
+              .lte('clock_in', rangeEnd.toISOString())
+              .eq('location_id', selectedLocation)
+              .order('clock_in', { ascending: false })
+          ]);
 
       if (employeesError) throw employeesError;
       if (sessionsError) throw sessionsError;
@@ -172,6 +190,12 @@ const AdminSessions: React.FC = () => {
             />
           </div>
         </div>
+
+        {activeLocationId === null && (
+          <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-700 text-sm font-bold">
+            Selecciona un local activo en el panel de administrador.
+          </div>
+        )}
 
         {error && (
           <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm font-bold">

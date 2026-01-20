@@ -135,12 +135,6 @@ const AdminDashboard: React.FC = () => {
               <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
           </select>
-          <div className="mt-3 rounded-2xl bg-gray-50 dark:bg-black/20 p-3">
-            <p className="text-xs font-bold uppercase text-gray-400 mb-1">Nombre del local</p>
-            <p className="text-lg font-black">
-              {locations.find((loc) => loc.id === selectedLocationId)?.name || 'Sin datos'}
-            </p>
-          </div>
         </div>
       </div>
 
