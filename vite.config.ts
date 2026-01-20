@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    const isVercel = process.env.VERCEL === '1';
+    const isGithubPages = process.env.GITHUB_ACTIONS === 'true';
     return {
-      base: mode === 'production' ? '/MiTurno/' : '/',
+      base: isVercel ? '/' : (isGithubPages ? '/MiTurno/' : '/'),
       server: {
         port: 3000,
         host: '0.0.0.0',
