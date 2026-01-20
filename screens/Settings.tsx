@@ -10,7 +10,12 @@ type AppSettings = {
   business_name: string | null;
   opening_time: string | null;
   max_hours: number | null;
-  qr_token?: string | null;
+};
+
+type LocationRow = {
+  id: string;
+  name: string;
+  qr_token: string | null;
 };
 
 const Settings: React.FC = () => {
@@ -18,7 +23,8 @@ const Settings: React.FC = () => {
   const [businessName, setBusinessName] = useState('');
   const [openingTime, setOpeningTime] = useState('08:00');
   const [maxHours, setMaxHours] = useState(12);
-  const [qrToken, setQrToken] = useState('');
+  const [locations, setLocations] = useState<LocationRow[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -32,19 +38,23 @@ const Settings: React.FC = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('app_settings')
-          .select('id, business_name, opening_time, max_hours, qr_token')
+          .select('id, business_name, opening_time, max_hours')
           .eq('id', 1)
           .maybeSingle<AppSettings>();
         if (fetchError) throw fetchError;
         if (data) {
-          const nextBusiness = data.business_name || '';
-          const nextOpening = data.opening_time || '08:00';
-          const nextMaxHours = data.max_hours ?? 12;
-          const nextToken = data.qr_token || '';
-          setBusinessName(nextBusiness);
-          setOpeningTime(nextOpening);
-          setMaxHours(nextMaxHours);
-          setQrToken(nextToken);
+          setBusinessName(data.business_name || '');
+          setOpeningTime(data.opening_time || '08:00');
+          setMaxHours(data.max_hours ?? 12);
+        }
+
+        const { data: locationsData } = await supabase
+          .from('locations')
+          .select('id, name, qr_token')
+          .order('name', { ascending: true });
+        setLocations((locationsData || []) as LocationRow[]);
+        if (locationsData && locationsData.length > 0) {
+          setSelectedLocationId(locationsData[0].id);
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -69,8 +79,7 @@ const Settings: React.FC = () => {
             id: 1,
             business_name: businessName.trim(),
             opening_time: openingTime,
-            max_hours: maxHours,
-            qr_token: qrToken || null
+            max_hours: maxHours
           },
           { onConflict: 'id' }
         );
@@ -84,11 +93,14 @@ const Settings: React.FC = () => {
     }
   };
 
+  const selectedLocation = useMemo(() => {
+    return locations.find((loc) => loc.id === selectedLocationId) || null;
+  }, [locations, selectedLocationId]);
 
   const qrValue = useMemo(() => {
-    if (!qrToken) return '';
-    return `${window.location.origin}${import.meta.env.BASE_URL}#/employee-main?point=${encodeURIComponent(qrToken)}`;
-  }, [qrToken]);
+    if (!selectedLocation?.qr_token) return '';
+    return `${window.location.origin}${import.meta.env.BASE_URL}#/employee-main?point=${encodeURIComponent(selectedLocation.qr_token)}`;
+  }, [selectedLocation]);
 
   const handlePrintQr = async () => {
     if (!qrValue) {
@@ -102,7 +114,7 @@ const Settings: React.FC = () => {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const title = businessName ? `Punto de fichaje - ${businessName}` : 'Punto de fichaje';
+      const title = selectedLocation?.name ? `Punto de fichaje - ${selectedLocation.name}` : 'Punto de fichaje';
 
       doc.setFontSize(18);
       doc.text(title, pageWidth / 2, 80, { align: 'center' });
@@ -220,11 +232,23 @@ const Settings: React.FC = () => {
           </div>
         </section>
 
-
         <section className="space-y-4 pt-2">
           <h3 className="px-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">Punto de Fichaje</h3>
           <div className="bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 p-8 shadow-soft flex flex-col items-center text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-300 via-primary to-orange-400"></div>
+
+            <div className="mb-6 w-full">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Selecciona local</label>
+              <select
+                value={selectedLocationId}
+                onChange={(e) => setSelectedLocationId(e.target.value)}
+                className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border-none font-black"
+              >
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+            </div>
 
             <div className="mb-8 relative group bg-white p-6 rounded-3xl shadow-xl border border-gray-50">
               {qrValue ? (

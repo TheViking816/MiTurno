@@ -10,8 +10,6 @@ const EmployeeMainAction: React.FC = () => {
   const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [employeeLocationId, setEmployeeLocationId] = useState<string | null>(null);
-  const [qrToken, setQrToken] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -44,25 +42,10 @@ const EmployeeMainAction: React.FC = () => {
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Empleado',
             role: 'Empleado'
           }]);
-        } else {
-          setEmployeeLocationId(profile.location_id || null);
         }
 
         const session = await supabaseService.getCurrentSession(user.id);
         setCurrentSession(session);
-      }
-
-      try {
-        const { data: settings } = await supabase
-          .from('app_settings')
-          .select('qr_token')
-          .eq('id', 1)
-          .maybeSingle();
-        setQrToken(settings?.qr_token || null);
-      } catch (error) {
-        console.error('Error checking QR token:', error);
-        setQrToken(null);
-        setScanError('No se pudo validar el QR.');
       }
 
       setLoading(false);
@@ -72,11 +55,6 @@ const EmployeeMainAction: React.FC = () => {
 
   useEffect(() => {
     if (!scanning) return;
-    if (!qrToken) {
-      setScanError('QR no configurado. Contacta con el administrador.');
-      setScanning(false);
-      return;
-    }
 
     let cancelled = false;
     const scanner = new Html5Qrcode('qr-reader');
@@ -91,18 +69,37 @@ const EmployeeMainAction: React.FC = () => {
           async (decodedText) => {
             if (cancelled) return;
             const scannedToken = extractToken(decodedText);
-            if (scannedToken !== qrToken) {
+
+            const { data: location } = await supabase
+              .from('locations')
+              .select('id')
+              .eq('qr_token', scannedToken)
+              .maybeSingle();
+
+            if (!location) {
               setScanError('QR incorrecto. Usa el QR del local.');
+              return;
+            }
+
+            const activeUser = userRef.current;
+            if (!activeUser) return;
+
+            const { data: profile } = await supabase
+              .from('employees')
+              .select('location_id')
+              .eq('id', activeUser.id)
+              .maybeSingle();
+
+            if (profile?.location_id && profile.location_id !== location.id) {
+              setScanError('Este QR no corresponde a tu local asignado.');
               return;
             }
 
             await stopScanner();
             setScanning(false);
 
-            const activeUser = userRef.current;
-            if (!activeUser) return;
             try {
-              const session = await supabaseService.clockIn(activeUser.id, employeeLocationId);
+              const session = await supabaseService.clockIn(activeUser.id, location.id);
               setCurrentSession(session);
               navigate('/clock-confirm', { state: { type: 'IN' } });
             } catch (error) {
@@ -135,7 +132,7 @@ const EmployeeMainAction: React.FC = () => {
       cancelled = true;
       stopScanner();
     };
-  }, [scanning, qrToken, navigate]);
+  }, [scanning, navigate]);
 
   const extractToken = (payload: string) => {
     try {
