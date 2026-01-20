@@ -120,6 +120,28 @@ const AdminSessions: React.FC = () => {
     }
   };
 
+  const handleDelete = async (sessionId: string) => {
+    if (!confirm('Eliminar este fichaje?')) return;
+    setSessions((prev) =>
+      prev.map((item) => (item.id === sessionId ? { ...item, saving: true } : item))
+    );
+    try {
+      const { error } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('id', sessionId);
+      if (error) throw error;
+      setSessions((prev) => prev.filter((item) => item.id !== sessionId));
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      setError('No se pudo eliminar el fichaje.');
+    } finally {
+      setSessions((prev) =>
+        prev.map((item) => (item.id === sessionId ? { ...item, saving: false } : item))
+      );
+    }
+  };
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-[#171412] dark:text-white font-display min-h-screen pb-32 max-w-md mx-auto">
       <div className="flex items-center px-6 py-6 justify-between sticky top-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md z-20">
@@ -177,13 +199,22 @@ const AdminSessions: React.FC = () => {
                     <p className="font-black text-lg">{employee?.name || 'Sin nombre'}</p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ID {session.user_id.slice(0, 8)}</p>
                   </div>
-                  <button
-                    onClick={() => handleSave(session.id)}
-                    disabled={session.saving}
-                    className="text-primary font-black text-xs uppercase tracking-widest disabled:opacity-50"
-                  >
-                    {session.saving ? 'Guardando...' : 'Guardar'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleSave(session.id)}
+                      disabled={session.saving}
+                      className="text-primary font-black text-xs uppercase tracking-widest disabled:opacity-50"
+                    >
+                      {session.saving ? 'Guardando...' : 'Guardar'}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(session.id)}
+                      disabled={session.saving}
+                      className="text-red-500 font-black text-xs uppercase tracking-widest disabled:opacity-50"
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div className="flex flex-col">
