@@ -1,0 +1,7 @@
+{
+  "name": "WorkTime Manager Pro",
+  "description": "A high-end employee time tracking system with QR scanning, incident management, and administrative dashboards.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
