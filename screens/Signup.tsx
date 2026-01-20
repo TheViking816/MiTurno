@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseService';
 import logoUrl from '../assets/logo.png';
@@ -18,8 +18,24 @@ const Signup: React.FC = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState(ROLES[2]); // Default: Camarero
+  const [locations, setLocations] = useState<any[]>([]);
+  const [locationId, setLocationId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      const { data } = await supabase
+        .from('locations')
+        .select('id, name')
+        .order('name', { ascending: true });
+      setLocations(data || []);
+      if (data && data.length > 0) {
+        setLocationId(data[0].id);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +59,8 @@ const Signup: React.FC = () => {
           .insert([{ 
             id: data.user.id, 
             name: name, 
-            role: role 
+            role: role,
+            location_id: locationId || null
           }]);
         
         if (profileError) throw profileError;
@@ -104,6 +121,19 @@ const Signup: React.FC = () => {
               className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer"
             >
               {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Local</label>
+            <select
+              value={locationId}
+              onChange={(e) => setLocationId(e.target.value)}
+              className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer"
+            >
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
             </select>
           </div>
 
