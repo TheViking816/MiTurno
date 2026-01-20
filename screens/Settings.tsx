@@ -34,7 +34,7 @@ const Settings: React.FC = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('app_settings')
-          .select('id, business_name, opening_time, max_hours, qr_token')
+          .select('id, business_name, opening_time, max_hours, qr_token, selected_location_id')
           .eq('id', 1)
           .maybeSingle<AppSettings>();
         if (fetchError) throw fetchError;
@@ -43,10 +43,12 @@ const Settings: React.FC = () => {
           const nextOpening = data.opening_time || '08:00';
           const nextMaxHours = data.max_hours ?? 12;
           const nextToken = data.qr_token || '';
+          const nextSelectedLocation = data.selected_location_id || '';
           setBusinessName(nextBusiness);
           setOpeningTime(nextOpening);
           setMaxHours(nextMaxHours);
           setQrToken(nextToken);
+          setSelectedLocationId(nextSelectedLocation);
         }
 
         const { data: locationsData } = await supabase
@@ -54,7 +56,7 @@ const Settings: React.FC = () => {
           .select('id, name')
           .order('name', { ascending: true });
         setLocations(locationsData || []);
-        if (locationsData && locationsData.length > 0) {
+        if (!data?.selected_location_id && locationsData && locationsData.length > 0) {
           setSelectedLocationId(locationsData[0].id);
         }
       } catch (err: any) {
@@ -81,7 +83,8 @@ const Settings: React.FC = () => {
             business_name: businessName.trim(),
             opening_time: openingTime,
             max_hours: maxHours,
-            qr_token: qrToken || null
+            qr_token: qrToken || null,
+            selected_location_id: selectedLocationId || null
           },
           { onConflict: 'id' }
         );
@@ -90,6 +93,35 @@ const Settings: React.FC = () => {
     } catch (err: any) {
       console.error('Error saving settings:', err);
       setError('No se pudieron guardar los ajustes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLocationSelect = async (nextId: string) => {
+    setSelectedLocationId(nextId);
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const { error: saveError } = await supabase
+        .from('app_settings')
+        .upsert(
+          {
+            id: 1,
+            business_name: businessName.trim(),
+            opening_time: openingTime,
+            max_hours: maxHours,
+            qr_token: qrToken || null,
+            selected_location_id: nextId || null
+          },
+          { onConflict: 'id' }
+        );
+      if (saveError) throw saveError;
+      setSuccess('Local guardado.');
+    } catch (err: any) {
+      console.error('Error saving location:', err);
+      setError('No se pudo guardar el local.');
     } finally {
       setSaving(false);
     }
@@ -237,7 +269,7 @@ const Settings: React.FC = () => {
               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Selecciona local</span>
               <select
                 value={selectedLocationId}
-                onChange={(e) => setSelectedLocationId(e.target.value)}
+                onChange={(e) => handleLocationSelect(e.target.value)}
                 className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border-none font-black"
               >
                 {locations.map((loc) => (
