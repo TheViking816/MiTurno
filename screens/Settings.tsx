@@ -19,6 +19,8 @@ const Settings: React.FC = () => {
   const [openingTime, setOpeningTime] = useState('08:00');
   const [maxHours, setMaxHours] = useState(12);
   const [qrToken, setQrToken] = useState('');
+  const [locations, setLocations] = useState<any[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -45,6 +47,15 @@ const Settings: React.FC = () => {
           setOpeningTime(nextOpening);
           setMaxHours(nextMaxHours);
           setQrToken(nextToken);
+        }
+
+        const { data: locationsData } = await supabase
+          .from('locations')
+          .select('id, name')
+          .order('name', { ascending: true });
+        setLocations(locationsData || []);
+        if (locationsData && locationsData.length > 0) {
+          setSelectedLocationId(locationsData[0].id);
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -215,6 +226,30 @@ const Settings: React.FC = () => {
                   +
                 </button>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4 pt-2">
+          <h3 className="px-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">Locales</h3>
+          <div className="bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 p-6 shadow-card space-y-4">
+            <label className="block">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Selecciona local</span>
+              <select
+                value={selectedLocationId}
+                onChange={(e) => setSelectedLocationId(e.target.value)}
+                className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border-none font-black"
+              >
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-2xl bg-gray-50 dark:bg-black/20 p-4">
+              <p className="text-xs font-bold uppercase text-gray-400 mb-1">Nombre del local</p>
+              <p className="text-lg font-black">
+                {locations.find((loc) => loc.id === selectedLocationId)?.name || 'Sin datos'}
+              </p>
             </div>
           </div>
         </section>

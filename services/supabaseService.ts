@@ -37,10 +37,15 @@ export const supabaseService = {
     return data;
   },
   
-  clockIn: async (userId: string) => {
+  clockIn: async (userId: string, locationId?: string | null) => {
     const { data, error } = await supabase
       .from('sessions')
-      .insert([{ user_id: userId, clock_in: new Date().toISOString(), status: 'open' }])
+      .insert([{
+        user_id: userId,
+        clock_in: new Date().toISOString(),
+        status: 'open',
+        location_id: locationId || null
+      }])
       .select()
       .single();
     if (error) throw error;

@@ -14,6 +14,7 @@ const ROLES = [
 const EmployeeManagement: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -36,6 +37,14 @@ const EmployeeManagement: React.FC = () => {
 
   useEffect(() => {
     fetchEmployees();
+    const fetchLocations = async () => {
+      const { data } = await supabase
+        .from('locations')
+        .select('id, name')
+        .order('name', { ascending: true });
+      setLocations(data || []);
+    };
+    fetchLocations();
   }, []);
 
   const handleRoleChange = async (empId: string, newRole: string) => {
@@ -45,6 +54,22 @@ const EmployeeManagement: React.FC = () => {
       setEmployees(prev => prev.map(emp => emp.id === empId ? { ...emp, role: newRole } : emp));
     } catch (error) {
       alert("Error al actualizar el puesto");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleLocationChange = async (empId: string, newLocationId: string) => {
+    setUpdatingId(empId);
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({ location_id: newLocationId || null })
+        .eq('id', empId);
+      if (error) throw error;
+      setEmployees(prev => prev.map(emp => emp.id === empId ? { ...emp, location_id: newLocationId } : emp));
+    } catch (error) {
+      alert('Error al actualizar el local');
     } finally {
       setUpdatingId(null);
     }
@@ -123,6 +148,29 @@ const EmployeeManagement: React.FC = () => {
                   </select>
                   <div className="absolute right-3 bottom-2 pointer-events-none text-primary">
                     <span className="material-symbols-outlined text-sm">edit</span>
+                  </div>
+                  {updatingId === emp.id && (
+                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative mt-2">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Local</label>
+                  <select
+                    value={emp.location_id || ''}
+                    disabled={updatingId === emp.id}
+                    onChange={(e) => handleLocationChange(emp.id, e.target.value)}
+                    className="w-full py-2 pl-3 pr-8 bg-gray-50 dark:bg-black/20 border-none rounded-xl text-xs font-black appearance-none cursor-pointer focus:ring-primary dark:text-white"
+                  >
+                    <option value="">Sin asignar</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 bottom-2 pointer-events-none text-primary">
+                    <span className="material-symbols-outlined text-sm">storefront</span>
                   </div>
                   {updatingId === emp.id && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">

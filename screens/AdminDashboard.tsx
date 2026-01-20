@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseService';
@@ -13,12 +12,10 @@ const AdminDashboard: React.FC = () => {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        // Contar total de empleados registrados
         const { count: totalCount, error: err1 } = await supabase
           .from('employees')
           .select('*', { count: 'exact', head: true });
-        
-        // Contar sesiones abiertas actualmente
+
         const { count: activeCount, error: err2 } = await supabase
           .from('sessions')
           .select('*', { count: 'exact', head: true })
@@ -27,9 +24,9 @@ const AdminDashboard: React.FC = () => {
         if (err1) console.error("Error totalCount:", err1);
         if (err2) console.error("Error activeCount:", err2);
 
-        setStats({ 
-          active: activeCount || 0, 
-          total: totalCount || 0 
+        setStats({
+          active: activeCount || 0,
+          total: totalCount || 0
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -37,10 +34,9 @@ const AdminDashboard: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchStats();
-    
-    // Suscripción en tiempo real para actualizar contadores cuando alguien ficha
+
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => fetchStats())
@@ -58,7 +54,7 @@ const AdminDashboard: React.FC = () => {
         <div className="flex justify-between items-end">
           <div>
             <p className="text-[13px] font-bold text-primary uppercase tracking-widest mb-1">Empresa • {today}</p>
-            <h1 className="text-3xl font-extrabold tracking-tight">Panel Gestión</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight">Panel Gestion</h1>
           </div>
           <button onClick={() => navigate('/employee-main')} className="flex h-12 w-12 items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 shadow-sm">
             <span className="material-symbols-outlined">qr_code_scanner</span>
@@ -78,8 +74,15 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="px-6">
-        <h2 className="text-xl font-extrabold mb-4">Acciones Rápidas</h2>
+        <h2 className="text-xl font-extrabold mb-4">Acciones Rapidas</h2>
         <div className="grid grid-cols-1 gap-3">
+          <button onClick={() => navigate('/sessions')} className="p-6 bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 flex items-center gap-4 shadow-card">
+            <span className="material-symbols-outlined text-primary text-3xl">schedule</span>
+            <div className="text-left">
+              <p className="font-black">Editar Fichajes</p>
+              <p className="text-xs text-gray-400 font-bold uppercase">Corregir horarios</p>
+            </div>
+          </button>
           <button onClick={() => navigate('/employees')} className="p-6 bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 flex items-center gap-4 shadow-card">
             <span className="material-symbols-outlined text-primary text-3xl">group</span>
             <div className="text-left">

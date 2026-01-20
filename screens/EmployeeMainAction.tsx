@@ -10,6 +10,7 @@ const EmployeeMainAction: React.FC = () => {
   const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [employeeLocationId, setEmployeeLocationId] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -33,7 +34,7 @@ const EmployeeMainAction: React.FC = () => {
 
         const { data: profile } = await supabase
           .from('employees')
-          .select('id')
+          .select('id, location_id')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -43,6 +44,8 @@ const EmployeeMainAction: React.FC = () => {
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Empleado',
             role: 'Empleado'
           }]);
+        } else {
+          setEmployeeLocationId(profile.location_id || null);
         }
 
         const session = await supabaseService.getCurrentSession(user.id);
@@ -99,7 +102,7 @@ const EmployeeMainAction: React.FC = () => {
             const activeUser = userRef.current;
             if (!activeUser) return;
             try {
-              const session = await supabaseService.clockIn(activeUser.id);
+              const session = await supabaseService.clockIn(activeUser.id, employeeLocationId);
               setCurrentSession(session);
               navigate('/clock-confirm', { state: { type: 'IN' } });
             } catch (error) {

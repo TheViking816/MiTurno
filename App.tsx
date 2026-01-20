@@ -13,6 +13,7 @@ import History from './screens/History';
 import AdminDashboard from './screens/AdminDashboard';
 import Incidences from './screens/Incidences';
 import EmployeeManagement from './screens/EmployeeManagement';
+import AdminSessions from './screens/AdminSessions';
 import Settings from './screens/Settings';
 import ExportHours from './screens/ExportHours';
 
@@ -101,6 +102,7 @@ const App: React.FC = () => {
               <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/employee-main" replace />} />
               <Route path="/incidences" element={isAdmin ? <Incidences /> : <Navigate to="/admin" replace />} />
               <Route path="/employees" element={isAdmin ? <EmployeeManagement /> : <Navigate to="/admin" replace />} />
+              <Route path="/sessions" element={isAdmin ? <AdminSessions /> : <Navigate to="/admin" replace />} />
               <Route path="/settings" element={isAdmin ? <Settings /> : <Navigate to="/admin" replace />} />
               <Route path="/export" element={isAdmin ? <ExportHours /> : <Navigate to="/admin" replace />} />
 

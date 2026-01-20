@@ -4,12 +4,13 @@ import { supabase } from '../services/supabaseService';
 
 export const BottomNavAdmin: React.FC = () => {
     const location = useLocation();
-    const isAdminPath = ['/admin', '/incidences', '/employees', '/settings', '/export'].includes(location.pathname);
+    const isAdminPath = ['/admin', '/incidences', '/employees', '/sessions', '/settings', '/export'].includes(location.pathname);
 
     if (!isAdminPath) return null;
 
     const navItems = [
         { path: '/admin', icon: 'dashboard', label: 'Panel' },
+        { path: '/sessions', icon: 'schedule', label: 'Fichajes' },
         { path: '/employees', icon: 'group', label: 'Equipo' },
         { path: '/settings', icon: 'settings', label: 'Ajustes' },
     ];
