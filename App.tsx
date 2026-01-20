@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { BottomNavAdmin, BottomNavEmployee } from './components/Navigation';
 import { supabase } from './services/supabaseService';
 
@@ -53,6 +53,7 @@ const App: React.FC = () => {
 
   return (
     <Router>
+      <QrParamSync />
       <div className="min-h-screen bg-background-light dark:bg-background-dark font-display overflow-x-hidden text-text-main dark:text-white">
         {!session ? (
           <Routes>
@@ -112,6 +113,26 @@ const App: React.FC = () => {
       </div>
     </Router>
   );
+};
+
+const QrParamSync: React.FC = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const token = params.get('point');
+    if (token) {
+      sessionStorage.setItem('turnqr_point', token);
+      return;
+    }
+
+    const hashMatch = window.location.hash.match(/point=([^&]+)/);
+    if (hashMatch?.[1]) {
+      sessionStorage.setItem('turnqr_point', decodeURIComponent(hashMatch[1]));
+    }
+  }, [location.search]);
+
+  return null;
 };
 
 export default App;

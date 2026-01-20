@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 import { supabase } from '../services/supabaseService';
 
 type AppSettings = {
@@ -19,6 +21,7 @@ const Settings: React.FC = () => {
   const [qrToken, setQrToken] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -34,10 +37,31 @@ const Settings: React.FC = () => {
           .maybeSingle<AppSettings>();
         if (fetchError) throw fetchError;
         if (data) {
-          setBusinessName(data.business_name || '');
-          setOpeningTime(data.opening_time || '08:00');
-          setMaxHours(data.max_hours ?? 12);
-          setQrToken(data.qr_token || '');
+          const nextBusiness = data.business_name || '';
+          const nextOpening = data.opening_time || '08:00';
+          const nextMaxHours = data.max_hours ?? 12;
+          const nextToken = data.qr_token || '';
+          setBusinessName(nextBusiness);
+          setOpeningTime(nextOpening);
+          setMaxHours(nextMaxHours);
+          setQrToken(nextToken);
+
+          if (!nextToken) {
+            const generatedToken = crypto.randomUUID();
+            setQrToken(generatedToken);
+            await supabase
+              .from('app_settings')
+              .upsert(
+                {
+                  id: 1,
+                  business_name: nextBusiness,
+                  opening_time: nextOpening,
+                  max_hours: nextMaxHours,
+                  qr_token: generatedToken
+                },
+                { onConflict: 'id' }
+              );
+          }
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -108,6 +132,42 @@ const Settings: React.FC = () => {
       setError('No se pudo regenerar el QR.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handlePrintQr = async () => {
+    if (!qrValue) {
+      setError('No hay QR disponible para imprimir.');
+      return;
+    }
+    setPrinting(true);
+    setError(null);
+    try {
+      const qrDataUrl = await QRCode.toDataURL(qrValue, { width: 600, margin: 2 });
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const title = businessName ? `Punto de fichaje - ${businessName}` : 'Punto de fichaje';
+
+      doc.setFontSize(18);
+      doc.text(title, pageWidth / 2, 80, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text('Escanea este QR para fichar', pageWidth / 2, 110, { align: 'center' });
+
+      const qrSize = 260;
+      const qrX = (pageWidth - qrSize) / 2;
+      const qrY = (pageHeight - qrSize) / 2 - 20;
+      doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+      doc.setFontSize(10);
+      doc.text(qrValue, pageWidth / 2, qrY + qrSize + 30, { align: 'center' });
+
+      doc.save('qr-fichaje.pdf');
+    } catch (err) {
+      console.error('Error printing QR:', err);
+      setError('No se pudo generar el PDF del QR.');
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -229,7 +289,13 @@ const Settings: React.FC = () => {
             </button>
             <div className="flex gap-4 w-full">
               <button onClick={() => navigate('/export')} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 rounded-2xl font-black text-xs uppercase tracking-widest">Exportar</button>
-              <button className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 rounded-2xl font-black text-xs uppercase tracking-widest">Imprimir</button>
+              <button
+                onClick={handlePrintQr}
+                disabled={printing || !qrValue}
+                className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 rounded-2xl font-black text-xs uppercase tracking-widest disabled:opacity-60"
+              >
+                {printing ? 'Generando...' : 'Imprimir'}
+              </button>
             </div>
           </div>
         </section>
