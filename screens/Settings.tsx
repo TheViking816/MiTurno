@@ -45,23 +45,6 @@ const Settings: React.FC = () => {
           setOpeningTime(nextOpening);
           setMaxHours(nextMaxHours);
           setQrToken(nextToken);
-
-          if (!nextToken) {
-            const generatedToken = crypto.randomUUID();
-            setQrToken(generatedToken);
-            await supabase
-              .from('app_settings')
-              .upsert(
-                {
-                  id: 1,
-                  business_name: nextBusiness,
-                  opening_time: nextOpening,
-                  max_hours: nextMaxHours,
-                  qr_token: generatedToken
-                },
-                { onConflict: 'id' }
-              );
-          }
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -103,37 +86,8 @@ const Settings: React.FC = () => {
 
   const qrValue = useMemo(() => {
     if (!qrToken) return '';
-    return `${window.location.origin}/#/employee-main?point=${encodeURIComponent(qrToken)}`;
+    return `${window.location.origin}${import.meta.env.BASE_URL}#/employee-main?point=${encodeURIComponent(qrToken)}`;
   }, [qrToken]);
-
-  const regenerateQr = async () => {
-    const nextToken = crypto.randomUUID();
-    setQrToken(nextToken);
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const { error: saveError } = await supabase
-        .from('app_settings')
-        .upsert(
-          {
-            id: 1,
-            business_name: businessName.trim(),
-            opening_time: openingTime,
-            max_hours: maxHours,
-            qr_token: nextToken
-          },
-          { onConflict: 'id' }
-        );
-      if (saveError) throw saveError;
-      setSuccess('QR regenerado y guardado.');
-    } catch (err: any) {
-      console.error('Error regenerating QR:', err);
-      setError('No se pudo regenerar el QR.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handlePrintQr = async () => {
     if (!qrValue) {
@@ -280,13 +234,6 @@ const Settings: React.FC = () => {
               )}
             </div>
 
-            <button
-              onClick={regenerateQr}
-              disabled={saving || loading}
-              className="w-full py-5 px-4 bg-primary text-white font-black rounded-3xl shadow-xl shadow-primary/20 mb-4 uppercase tracking-widest disabled:opacity-60"
-            >
-              Regenerar QR
-            </button>
             <div className="flex gap-4 w-full">
               <button onClick={() => navigate('/export')} className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 rounded-2xl font-black text-xs uppercase tracking-widest">Exportar</button>
               <button

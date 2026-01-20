@@ -1,34 +1,26 @@
-
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 import { supabase, supabaseService } from '../services/supabaseService';
 import { WorkSession } from '../types';
 import logoUrl from '../assets/logo.png';
 
 const EmployeeMainAction: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [qrValid, setQrValid] = useState(false);
-  const [qrMessage, setQrMessage] = useState<string | null>(null);
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
     const init = async () => {
-      const params = new URLSearchParams(location.search);
-      const urlToken = params.get('point');
-      if (urlToken) {
-        sessionStorage.setItem('turnqr_point', urlToken);
-      }
-      const storedToken = sessionStorage.getItem('turnqr_point');
-      const tokenToCheck = urlToken || storedToken;
-
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
-        
-        // Fail-safe: Asegurar que el usuario existe en la tabla employees
+
         const { data: profile } = await supabase
           .from('employees')
           .select('id')
@@ -53,48 +45,102 @@ const EmployeeMainAction: React.FC = () => {
           .select('qr_token')
           .eq('id', 1)
           .maybeSingle();
-        const requiredToken = settings?.qr_token || null;
-        if (!requiredToken) {
-          setQrValid(false);
-          setQrMessage('QR no configurado. Contacta con el administrador.');
-        } else if (tokenToCheck && tokenToCheck === requiredToken) {
-          setQrValid(true);
-          setQrMessage(null);
-        } else {
-          setQrValid(false);
-          setQrMessage('Debes escanear el QR del local para fichar.');
-        }
+        setQrToken(settings?.qr_token || null);
       } catch (error) {
         console.error('Error checking QR token:', error);
-        setQrValid(false);
-        setQrMessage('No se pudo validar el QR.');
+        setQrToken(null);
+        setScanError('No se pudo validar el QR.');
       }
 
       setLoading(false);
     };
     init();
-  }, [location.search]);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.clear().catch(() => {});
+      }
+    };
+  }, []);
+
+  const extractToken = (payload: string) => {
+    try {
+      const url = new URL(payload);
+      const token = url.searchParams.get('point');
+      if (token) return token;
+    } catch {
+      // ignore
+    }
+    const match = payload.match(/point=([^&]+)/);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+    return payload;
+  };
+
+  const stopScanner = async () => {
+    if (!scannerRef.current) return;
+    try {
+      await scannerRef.current.stop();
+      await scannerRef.current.clear();
+    } catch {
+      // ignore
+    }
+  };
+
+  const startScanner = async () => {
+    if (!qrToken) {
+      setScanError('QR no configurado. Contacta con el administrador.');
+      return;
+    }
+    setScanError(null);
+    setScanning(true);
+    const scanner = new Html5Qrcode('qr-reader');
+    scannerRef.current = scanner;
+
+    try {
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 240 },
+        async (decodedText) => {
+          const scannedToken = extractToken(decodedText);
+          if (scannedToken !== qrToken) {
+            setScanError('QR incorrecto. Usa el QR del local.');
+            return;
+          }
+
+          await stopScanner();
+          setScanning(false);
+
+          if (!user) return;
+          try {
+            if (currentSession) {
+              await supabaseService.clockOut(currentSession.id);
+              setCurrentSession(null);
+              navigate('/clock-confirm', { state: { type: 'OUT' } });
+            } else {
+              const session = await supabaseService.clockIn(user.id);
+              setCurrentSession(session);
+              navigate('/clock-confirm', { state: { type: 'IN' } });
+            }
+          } catch (error) {
+            console.error('Error al fichar:', error);
+            alert('Error al registrar: Asegurate de tener conexion.');
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error starting scanner:', error);
+      setScanError('No se pudo iniciar la camara.');
+      setScanning(false);
+      await stopScanner();
+    }
+  };
 
   const handleClockAction = async () => {
     if (!user) return;
-    if (!qrValid) {
-      alert('Debes escanear el QR del local para fichar.');
-      return;
-    }
-    try {
-      if (currentSession) {
-        await supabaseService.clockOut(currentSession.id);
-        setCurrentSession(null);
-        navigate('/clock-confirm', { state: { type: 'OUT' } });
-      } else {
-        const session = await supabaseService.clockIn(user.id);
-        setCurrentSession(session);
-        navigate('/clock-confirm', { state: { type: 'IN' } });
-      }
-    } catch (error) {
-      console.error("Error al fichar:", error);
-      alert("Error al registrar: Asegúrate de tener conexión.");
-    }
+    await startScanner();
   };
 
   if (loading) return null;
@@ -114,15 +160,14 @@ const EmployeeMainAction: React.FC = () => {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center z-10">
-        {qrMessage && (
+        {scanError && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold text-center">
-            {qrMessage}
+            {scanError}
           </div>
         )}
         <button
           onClick={handleClockAction}
-          disabled={!qrValid}
-          className={`relative w-full aspect-square max-w-[280px] text-white rounded-full flex flex-col items-center justify-center gap-4 shadow-2xl transition-all border-[10px] border-white dark:border-zinc-800 ring-4 ${qrValid ? 'active:scale-95' : 'opacity-60 cursor-not-allowed'} ${currentSession ? 'bg-danger ring-danger/30' : 'bg-action-green ring-action-green/30'}`}
+          className={`relative w-full aspect-square max-w-[280px] text-white rounded-full flex flex-col items-center justify-center gap-4 shadow-2xl transition-all border-[10px] border-white dark:border-zinc-800 ring-4 active:scale-95 ${currentSession ? 'bg-danger ring-danger/30' : 'bg-action-green ring-action-green/30'}`}
         >
           <span className="material-symbols-outlined text-[90px] font-light">
             {currentSession ? 'logout' : 'qr_code_scanner'}
@@ -138,7 +183,7 @@ const EmployeeMainAction: React.FC = () => {
 
       <footer className="pb-10 flex flex-col items-center gap-4 z-10">
         <div className="bg-white dark:bg-zinc-900 px-8 py-4 rounded-full border border-gray-100 dark:border-zinc-800 shadow-card">
-          <span className="text-xl font-bold tracking-tight text-text-main dark:text-white">Estado: <span className="font-black text-action-green">En línea</span></span>
+          <span className="text-xl font-bold tracking-tight text-text-main dark:text-white">Estado: <span className="font-black text-action-green">En linea</span></span>
         </div>
         <div className="flex items-center gap-3 mt-2 cursor-pointer p-2 bg-white/50 dark:bg-black/20 rounded-2xl" onClick={() => navigate('/profile')}>
           <div className="size-10 rounded-full overflow-hidden border-2 border-primary/20 bg-gray-100 flex items-center justify-center">
@@ -152,6 +197,24 @@ const EmployeeMainAction: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {scanning && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/70 px-6">
+          <div className="w-full max-w-xs bg-white rounded-3xl p-4 shadow-2xl">
+            <div className="text-center font-black text-sm uppercase tracking-widest text-gray-500 mb-3">Escanear QR</div>
+            <div id="qr-reader" className="w-full overflow-hidden rounded-2xl"></div>
+            <button
+              onClick={async () => {
+                await stopScanner();
+                setScanning(false);
+              }}
+              className="mt-4 w-full py-3 rounded-2xl bg-gray-100 font-black text-xs uppercase tracking-widest"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
