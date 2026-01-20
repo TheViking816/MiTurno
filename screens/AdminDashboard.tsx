@@ -6,6 +6,10 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ active: 0, total: 0 });
   const [loading, setLoading] = useState(true);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
 
   useEffect(() => {
@@ -37,6 +41,29 @@ const AdminDashboard: React.FC = () => {
 
     fetchStats();
 
+    const fetchLocations = async () => {
+      try {
+        const { data: settings } = await supabase
+          .from('app_settings')
+          .select('selected_location_id')
+          .eq('id', 1)
+          .maybeSingle();
+        const { data: locationsData, error } = await supabase
+          .from('locations')
+          .select('id, name')
+          .order('name', { ascending: true });
+        if (error) throw error;
+        setLocations(locationsData || []);
+        const selected = settings?.selected_location_id || locationsData?.[0]?.id || '';
+        setSelectedLocationId(selected);
+      } catch (error) {
+        console.error('Error loading locations:', error);
+        setLocationError('No se pudieron cargar los locales.');
+      }
+    };
+
+    fetchLocations();
+
     const channel = supabase
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => fetchStats())
@@ -47,6 +74,23 @@ const AdminDashboard: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleLocationSelect = async (nextId: string) => {
+    setSelectedLocationId(nextId);
+    setSavingLocation(true);
+    setLocationError(null);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({ id: 1, selected_location_id: nextId || null }, { onConflict: 'id' });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving location:', error);
+      setLocationError('No se pudo guardar el local.');
+    } finally {
+      setSavingLocation(false);
+    }
+  };
 
   return (
     <div className="relative flex min-h-screen w-full flex-col pb-32 bg-background-light dark:bg-background-dark max-w-md mx-auto">
@@ -70,6 +114,33 @@ const AdminDashboard: React.FC = () => {
         <div className="flex flex-col items-center justify-center py-6 bg-white dark:bg-surface-dark rounded-3xl border border-gray-200 shadow-sm">
           <span className="text-4xl font-black text-text-main dark:text-white">{loading ? '...' : stats.total}</span>
           <span className="text-[10px] font-bold uppercase text-gray-400 mt-1">Plantilla</span>
+        </div>
+      </div>
+
+      <div className="px-6 pb-2">
+        <div className="bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 p-4 shadow-card">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Local activo</p>
+          {locationError && (
+            <div className="mb-3 p-3 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold">
+              {locationError}
+            </div>
+          )}
+          <select
+            value={selectedLocationId}
+            onChange={(e) => handleLocationSelect(e.target.value)}
+            disabled={savingLocation}
+            className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border-none font-black"
+          >
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>{loc.name}</option>
+            ))}
+          </select>
+          <div className="mt-3 rounded-2xl bg-gray-50 dark:bg-black/20 p-3">
+            <p className="text-xs font-bold uppercase text-gray-400 mb-1">Nombre del local</p>
+            <p className="text-lg font-black">
+              {locations.find((loc) => loc.id === selectedLocationId)?.name || 'Sin datos'}
+            </p>
+          </div>
         </div>
       </div>
 

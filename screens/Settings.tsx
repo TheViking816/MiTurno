@@ -19,8 +19,6 @@ const Settings: React.FC = () => {
   const [openingTime, setOpeningTime] = useState('08:00');
   const [maxHours, setMaxHours] = useState(12);
   const [qrToken, setQrToken] = useState('');
-  const [locations, setLocations] = useState<any[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -34,7 +32,7 @@ const Settings: React.FC = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('app_settings')
-          .select('id, business_name, opening_time, max_hours, qr_token, selected_location_id')
+          .select('id, business_name, opening_time, max_hours, qr_token')
           .eq('id', 1)
           .maybeSingle<AppSettings>();
         if (fetchError) throw fetchError;
@@ -43,21 +41,10 @@ const Settings: React.FC = () => {
           const nextOpening = data.opening_time || '08:00';
           const nextMaxHours = data.max_hours ?? 12;
           const nextToken = data.qr_token || '';
-          const nextSelectedLocation = data.selected_location_id || '';
           setBusinessName(nextBusiness);
           setOpeningTime(nextOpening);
           setMaxHours(nextMaxHours);
           setQrToken(nextToken);
-          setSelectedLocationId(nextSelectedLocation);
-        }
-
-        const { data: locationsData } = await supabase
-          .from('locations')
-          .select('id, name')
-          .order('name', { ascending: true });
-        setLocations(locationsData || []);
-        if (!data?.selected_location_id && locationsData && locationsData.length > 0) {
-          setSelectedLocationId(locationsData[0].id);
         }
       } catch (err: any) {
         console.error('Error loading settings:', err);
@@ -83,8 +70,7 @@ const Settings: React.FC = () => {
             business_name: businessName.trim(),
             opening_time: openingTime,
             max_hours: maxHours,
-            qr_token: qrToken || null,
-            selected_location_id: selectedLocationId || null
+            qr_token: qrToken || null
           },
           { onConflict: 'id' }
         );
@@ -98,34 +84,6 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleLocationSelect = async (nextId: string) => {
-    setSelectedLocationId(nextId);
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const { error: saveError } = await supabase
-        .from('app_settings')
-        .upsert(
-          {
-            id: 1,
-            business_name: businessName.trim(),
-            opening_time: openingTime,
-            max_hours: maxHours,
-            qr_token: qrToken || null,
-            selected_location_id: nextId || null
-          },
-          { onConflict: 'id' }
-        );
-      if (saveError) throw saveError;
-      setSuccess('Local guardado.');
-    } catch (err: any) {
-      console.error('Error saving location:', err);
-      setError('No se pudo guardar el local.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const qrValue = useMemo(() => {
     if (!qrToken) return '';
@@ -262,29 +220,6 @@ const Settings: React.FC = () => {
           </div>
         </section>
 
-        <section className="space-y-4 pt-2">
-          <h3 className="px-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">Locales</h3>
-          <div className="bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 p-6 shadow-card space-y-4">
-            <label className="block">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Selecciona local</span>
-              <select
-                value={selectedLocationId}
-                onChange={(e) => handleLocationSelect(e.target.value)}
-                className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border-none font-black"
-              >
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-            </label>
-            <div className="rounded-2xl bg-gray-50 dark:bg-black/20 p-4">
-              <p className="text-xs font-bold uppercase text-gray-400 mb-1">Nombre del local</p>
-              <p className="text-lg font-black">
-                {locations.find((loc) => loc.id === selectedLocationId)?.name || 'Sin datos'}
-              </p>
-            </div>
-          </div>
-        </section>
 
         <section className="space-y-4 pt-2">
           <h3 className="px-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">Punto de Fichaje</h3>
