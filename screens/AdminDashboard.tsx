@@ -26,6 +26,7 @@ const AdminDashboard: React.FC = () => {
   const [showActiveList, setShowActiveList] = useState(false);
   const [showRoster, setShowRoster] = useState(false);
   const today = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+  const timeNow = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
   const employeeMap = useMemo(() => new Map(employees.map((emp) => [emp.id, emp])), [employees]);
 
@@ -126,7 +127,7 @@ const AdminDashboard: React.FC = () => {
       <header className="sticky top-0 z-30 bg-white dark:bg-background-dark px-6 pt-8 pb-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-[13px] font-bold text-primary uppercase tracking-widest mb-1">Empresa • {today}</p>
+            <p className="text-[13px] font-bold text-primary uppercase tracking-widest mb-1">{today} · {timeNow}</p>
             <h1 className="text-3xl font-extrabold tracking-tight">Panel Gestion</h1>
           </div>
           <button onClick={() => navigate('/employee-main')} className="flex h-12 w-12 items-center justify-center rounded-full bg-white dark:bg-surface-dark border border-gray-200 shadow-sm">
