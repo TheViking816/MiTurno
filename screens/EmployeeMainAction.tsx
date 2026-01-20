@@ -99,16 +99,9 @@ const EmployeeMainAction: React.FC = () => {
             const activeUser = userRef.current;
             if (!activeUser) return;
             try {
-              const activeSession = sessionRef.current;
-              if (activeSession) {
-                await supabaseService.clockOut(activeSession.id);
-                setCurrentSession(null);
-                navigate('/clock-confirm', { state: { type: 'OUT' } });
-              } else {
-                const session = await supabaseService.clockIn(activeUser.id);
-                setCurrentSession(session);
-                navigate('/clock-confirm', { state: { type: 'IN' } });
-              }
+              const session = await supabaseService.clockIn(activeUser.id);
+              setCurrentSession(session);
+              navigate('/clock-confirm', { state: { type: 'IN' } });
             } catch (error) {
               console.error('Error al fichar:', error);
               alert('Error al registrar: Asegurate de tener conexion.');
@@ -156,6 +149,19 @@ const EmployeeMainAction: React.FC = () => {
 
   const handleClockAction = async () => {
     if (!user) return;
+
+    if (currentSession) {
+      try {
+        await supabaseService.clockOut(currentSession.id);
+        setCurrentSession(null);
+        navigate('/clock-confirm', { state: { type: 'OUT' } });
+      } catch (error) {
+        console.error('Error al fichar:', error);
+        alert('Error al registrar: Asegurate de tener conexion.');
+      }
+      return;
+    }
+
     setScanning(true);
   };
 
