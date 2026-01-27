@@ -25,13 +25,31 @@ const Signup: React.FC = () => {
 
   useEffect(() => {
     const fetchLocations = async () => {
-      const { data } = await supabase
-        .from('locations')
-        .select('id, name')
-        .order('name', { ascending: true });
-      setLocations(data || []);
-      if (data && data.length > 0) {
-        setLocationId(data[0].id);
+      console.log("Iniciando carga de locales...");
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('locations')
+          .select('id, name')
+          .order('name', { ascending: true });
+
+        if (fetchError) {
+          console.error("Error al cargar locales:", fetchError);
+          setError("No se pudieron cargar los locales de la base de datos.");
+          return;
+        }
+
+        console.log("Locales cargados en Signup:", data);
+        if (data && data.length > 0) {
+          setLocations(data);
+          // Solo establecemos el primer local si no hay uno seleccionado
+          setLocationId(data[0].id);
+        } else {
+          console.warn("La tabla de locales está vacía.");
+          setError("No se han encontrado locales configurados en el sistema.");
+        }
+      } catch (err: any) {
+        console.error("Excepción al cargar locales:", err);
+        setError("Error de conexión al cargar locales.");
       }
     };
     fetchLocations();
@@ -56,15 +74,15 @@ const Signup: React.FC = () => {
       if (data.user) {
         const { error: profileError } = await supabase
           .from('employees')
-          .insert([{ 
-            id: data.user.id, 
-            name: name, 
+          .insert([{
+            id: data.user.id,
+            name: name,
             role: role,
             location_id: locationId || null
           }]);
-        
+
         if (profileError) throw profileError;
-        
+
         alert("¡Registro exitoso! Ya puedes iniciar sesión.");
         navigate('/login');
       }
@@ -91,7 +109,7 @@ const Signup: React.FC = () => {
         <form onSubmit={handleSignup} className="space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Nombre Completo</label>
-            <input 
+            <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -103,7 +121,7 @@ const Signup: React.FC = () => {
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Email Personal</label>
-            <input 
+            <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -116,7 +134,7 @@ const Signup: React.FC = () => {
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Puesto / Rol</label>
             <div className="relative">
-              <select 
+              <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10"
@@ -155,7 +173,7 @@ const Signup: React.FC = () => {
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Contraseña</label>
-            <input 
+            <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -171,7 +189,7 @@ const Signup: React.FC = () => {
             </div>
           )}
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
             className="w-full h-16 bg-primary text-white rounded-3xl font-black text-lg shadow-xl active:scale-[0.98] transition-all disabled:opacity-50"
@@ -180,7 +198,7 @@ const Signup: React.FC = () => {
           </button>
         </form>
 
-        <button 
+        <button
           onClick={() => navigate('/login')}
           className="w-full text-center text-gray-400 text-sm font-bold uppercase tracking-widest"
         >
