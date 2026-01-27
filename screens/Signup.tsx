@@ -96,7 +96,7 @@ const Signup: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold"
-              placeholder="Juan Pérez"
+              placeholder="Escribe tu nombre"
               required
             />
           </div>
@@ -115,26 +115,42 @@ const Signup: React.FC = () => {
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Puesto / Rol</label>
-            <select 
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer"
-            >
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <div className="relative">
+              <select 
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10"
+              >
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Local</label>
-            <select
-              value={locationId}
-              onChange={(e) => setLocationId(e.target.value)}
-              className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer"
-            >
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10"
+                required
+              >
+                <option value="" disabled>Selecciona tu local</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-1">
