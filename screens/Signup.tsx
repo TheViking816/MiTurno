@@ -25,7 +25,6 @@ const Signup: React.FC = () => {
 
   useEffect(() => {
     const fetchLocations = async () => {
-      console.log("Iniciando carga de locales...");
       try {
         const { data, error: fetchError } = await supabase
           .from('locations')
@@ -33,22 +32,18 @@ const Signup: React.FC = () => {
           .order('name', { ascending: true });
 
         if (fetchError) {
-          console.error("Error al cargar locales:", fetchError);
           setError("No se pudieron cargar los locales de la base de datos.");
           return;
         }
 
-        console.log("Locales cargados en Signup:", data);
         if (data && data.length > 0) {
           setLocations(data);
           // Solo establecemos el primer local si no hay uno seleccionado
           setLocationId(data[0].id);
         } else {
-          console.warn("La tabla de locales está vacía.");
           setError("No se han encontrado locales configurados en el sistema.");
         }
       } catch (err: any) {
-        console.error("Excepción al cargar locales:", err);
         setError("Error de conexión al cargar locales.");
       }
     };
@@ -137,7 +132,7 @@ const Signup: React.FC = () => {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10"
+                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10 bg-none"
               >
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -155,7 +150,7 @@ const Signup: React.FC = () => {
               <select
                 value={locationId}
                 onChange={(e) => setLocationId(e.target.value)}
-                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10"
+                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10 bg-none"
                 required
               >
                 <option value="" disabled>Selecciona tu local</option>
