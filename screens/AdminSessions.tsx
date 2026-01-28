@@ -120,11 +120,13 @@ const AdminSessions: React.FC = () => {
     try {
       const clockIn = target.clockInLocal ? new Date(target.clockInLocal).toISOString() : null;
       const clockOut = target.clockOutLocal ? new Date(target.clockOutLocal).toISOString() : null;
+      const status = clockOut ? 'closed' : 'open';
       const { error } = await supabase
         .from('sessions')
         .update({
           clock_in: clockIn,
-          clock_out: clockOut
+          clock_out: clockOut,
+          status
         })
         .eq('id', sessionId);
       if (error) throw error;

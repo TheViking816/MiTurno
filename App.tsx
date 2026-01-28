@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [initialized, setInitialized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [employeeLocation, setEmployeeLocation] = useState<string | null>(null);
 
   // Email exacto proporcionado para acceso de gestión
   const ADMIN_EMAIL = 'brutal.soul.25@gmail.com';
@@ -49,6 +50,26 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const fetchEmployeeLocation = async () => {
+      if (!session?.user?.id) {
+        setEmployeeLocation(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('employees')
+        .select('location_id, locations(name)')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const locationName = (data as any)?.locations?.name || null;
+      setEmployeeLocation(locationName);
+    };
+
+    fetchEmployeeLocation();
+  }, [session?.user?.id]);
 
   if (!initialized) return null;
 
@@ -84,6 +105,12 @@ const App: React.FC = () => {
                       <span className={`size-2 rounded-full ${isAdmin ? 'bg-primary' : 'bg-action-green'}`}></span>
                       <p className="text-[10px] font-black text-primary uppercase">{isAdmin ? 'Administrador' : 'Empleado'}</p>
                     </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-card border border-gray-100 dark:border-gray-800 mb-6">
+                    <p className="text-xs font-bold text-gray-400 uppercase mb-1">Local Asignado</p>
+                    <p className="font-black text-lg">{employeeLocation || 'Sin asignar'}</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-2">Solo lectura</p>
                   </div>
 
                   {isAdmin && (

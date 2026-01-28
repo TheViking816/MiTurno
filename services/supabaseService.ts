@@ -30,7 +30,7 @@ export const supabaseService = {
       .from('sessions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'open')
+      .is('clock_out', null)
       .order('clock_in', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -52,11 +52,12 @@ export const supabaseService = {
     return data;
   },
 
-  clockOut: async (sessionId: string) => {
+  clockOut: async (userId: string) => {
     const { error } = await supabase
       .from('sessions')
       .update({ clock_out: new Date().toISOString(), status: 'closed' })
-      .eq('id', sessionId);
+      .eq('user_id', userId)
+      .is('clock_out', null);
     if (error) throw error;
   },
 

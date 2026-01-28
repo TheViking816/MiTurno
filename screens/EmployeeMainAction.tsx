@@ -152,7 +152,7 @@ const EmployeeMainAction: React.FC = () => {
 
     if (currentSession) {
       try {
-        await supabaseService.clockOut(currentSession.id);
+        await supabaseService.clockOut(user.id);
         setCurrentSession(null);
         navigate('/clock-confirm', { state: { type: 'OUT' } });
       } catch (error) {
