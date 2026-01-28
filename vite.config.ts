@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     const isVercel = process.env.VERCEL === '1';
     const isGithubPages = process.env.GITHUB_ACTIONS === 'true';
     return {
-      base: isVercel ? '/' : (isGithubPages ? '/MiTurno/' : '/'),
+      base: isVercel ? '/' : (isGithubPages ? '/MiTurno/' : './'),
       server: {
         port: 3000,
         host: '0.0.0.0',
@@ -20,6 +20,19 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+        }
+      },
+      build: {
+        assetsInlineLimit: 0,
+        rollupOptions: {
+          output: {
+            assetFileNames: (assetInfo) => {
+              if (assetInfo.name?.endsWith('.png') || assetInfo.name?.endsWith('.jpg') || assetInfo.name?.endsWith('.svg')) {
+                return 'assets/[name].[ext]';
+              }
+              return 'assets/[name].[hash].[ext]';
+            }
+          }
         }
       }
     };
