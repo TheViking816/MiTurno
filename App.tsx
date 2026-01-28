@@ -71,6 +71,13 @@ const App: React.FC = () => {
     fetchEmployeeLocation();
   }, [session?.user?.id]);
 
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+  };
+
   if (!initialized) return null;
 
   return (
@@ -119,7 +126,7 @@ const App: React.FC = () => {
                     </button>
                   )}
                   
-                  <button onClick={() => supabase.auth.signOut()} className="w-full p-6 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-3xl font-black text-left flex justify-between items-center transition-transform active:scale-95">
+                  <button onClick={handleSignOut} className="w-full p-6 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-3xl font-black text-left flex justify-between items-center transition-transform active:scale-95">
                     Cerrar Sesión <span className="material-symbols-outlined font-black">logout</span>
                   </button>
                 </div>
