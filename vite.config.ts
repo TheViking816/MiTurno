@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
     const isVercel = process.env.VERCEL === '1';
     const isGithubPages = process.env.GITHUB_ACTIONS === 'true';
     return {
-      base: isVercel ? '/' : (isGithubPages ? '/MiTurno/' : './'),
+      base: '/',
       server: {
         port: 3000,
         host: '0.0.0.0',
@@ -33,7 +33,8 @@ export default defineConfig(({ mode }) => {
               return 'assets/[name].[hash].[ext]';
             }
           }
-        }
+        },
+        copyPublicDir: true
       }
     };
 });

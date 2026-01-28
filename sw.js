@@ -1,11 +1,11 @@
 const CACHE_NAME = 'miturno-v1';
 const urlsToCache = [
-  './',
-  './index.html',
-  './manifest.webmanifest',
-  './assets/icono-192.png',
-  './assets/icono-512.png',
-  './assets/icono.png'
+  '/',
+  '/index.html',
+  '/assets/manifest.webmanifest',
+  '/assets/icono-192.png',
+  '/assets/icono-512.png',
+  '/assets/icono.png'
 ];
 
 self.addEventListener('install', (event) => {
