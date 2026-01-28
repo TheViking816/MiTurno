@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { BottomNavAdmin, BottomNavEmployee } from './components/Navigation';
-import { supabase } from './services/supabaseService';
+import { clearAuthStorage, supabase } from './services/supabaseService';
 
 // Screens
 import Login from './screens/Login';
@@ -75,7 +75,7 @@ const App: React.FC = () => {
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) {
       console.error('Error al cerrar sesión:', error);
-      await supabase.auth.clearSession();
+      clearAuthStorage();
     }
   };
 

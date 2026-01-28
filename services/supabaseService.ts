@@ -3,8 +3,18 @@ import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://jskngeempmmrtgohijhy.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impza25nZWVtcG1tcnRnb2hpamh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4Njg5MTIsImV4cCI6MjA4NDQ0NDkxMn0.JT5f0d3FW5XkyazU1Hu-Cazk2AS5JRaZEmrXjG0ei2o';
+const AUTH_STORAGE_KEY = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+export const clearAuthStorage = () => {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+};
 
 export const supabaseService = {
   getCurrentEmployee: async (userId: string) => {

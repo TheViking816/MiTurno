@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { supabase } from '../services/supabaseService';
+import { clearAuthStorage, supabase } from '../services/supabaseService';
 
 export const BottomNavAdmin: React.FC = () => {
     const location = useLocation();
@@ -19,7 +19,7 @@ export const BottomNavAdmin: React.FC = () => {
         const { error } = await supabase.auth.signOut({ scope: 'local' });
         if (error) {
             console.error('Error al cerrar sesión:', error);
-            await supabase.auth.clearSession();
+            clearAuthStorage();
         }
     };
 
@@ -64,7 +64,7 @@ export const BottomNavEmployee: React.FC = () => {
         const { error } = await supabase.auth.signOut({ scope: 'local' });
         if (error) {
             console.error('Error al cerrar sesión:', error);
-            await supabase.auth.clearSession();
+            clearAuthStorage();
         }
     };
 
