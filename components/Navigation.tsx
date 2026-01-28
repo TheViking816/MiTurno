@@ -16,7 +16,10 @@ export const BottomNavAdmin: React.FC = () => {
     ];
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
+        if (error) {
+            console.error('Error al cerrar sesión:', error);
+        }
     };
 
     return (
@@ -57,7 +60,10 @@ export const BottomNavEmployee: React.FC = () => {
     ];
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
+        if (error) {
+            console.error('Error al cerrar sesión:', error);
+        }
     };
 
     return (
