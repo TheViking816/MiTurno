@@ -27,6 +27,62 @@ export const supabaseService = {
     return data;
   },
 
+  getEmployeeLocations: async (userId: string) => {
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('location_id, locations(name)')
+      .eq('employee_id', userId);
+    if (error) return [];
+    return (data || []).map((row: any) => ({
+      id: row.location_id,
+      name: row.locations?.name || ''
+    }));
+  },
+
+  getEmployeeLocationIds: async (userId: string) => {
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('location_id')
+      .eq('employee_id', userId);
+    if (error) return [] as string[];
+    return (data || []).map((row: any) => row.location_id).filter(Boolean);
+  },
+
+  setEmployeeLocations: async (userId: string, locationIds: string[]) => {
+    const { error: deleteError } = await supabase
+      .from('employee_locations')
+      .delete()
+      .eq('employee_id', userId);
+    if (deleteError) throw deleteError;
+
+    if (locationIds.length > 0) {
+      const rows = locationIds.map((locationId) => ({
+        employee_id: userId,
+        location_id: locationId
+      }));
+      const { error: insertError } = await supabase
+        .from('employee_locations')
+        .insert(rows);
+      if (insertError) throw insertError;
+    }
+
+    const primaryLocation = locationIds[0] || null;
+    const { error: updateError } = await supabase
+      .from('employees')
+      .update({ location_id: primaryLocation })
+      .eq('id', userId);
+    if (updateError) throw updateError;
+  },
+
+  getEmployeeIdsByLocation: async (locationId: string) => {
+    const { data, error } = await supabase
+      .from('employee_locations')
+      .select('employee_id')
+      .eq('location_id', locationId);
+    if (error) return [] as string[];
+    return (data || []).map((row: any) => row.employee_id).filter(Boolean);
+  },
+
   updateEmployeeRole: async (employeeId: string, newRole: string) => {
     const { error } = await supabase
       .from('employees')

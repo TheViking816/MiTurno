@@ -19,7 +19,7 @@ const Signup: React.FC = () => {
   const [name, setName] = useState('');
   const [role, setRole] = useState(ROLES[2]); // Default: Camarero
   const [locations, setLocations] = useState<any[]>([]);
-  const [locationId, setLocationId] = useState('');
+  const [locationIds, setLocationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,8 +38,6 @@ const Signup: React.FC = () => {
 
         if (data && data.length > 0) {
           setLocations(data);
-          // Solo establecemos el primer local si no hay uno seleccionado
-          setLocationId(data[0].id);
         } else {
           setError("No se han encontrado locales configurados en el sistema.");
         }
@@ -67,20 +65,37 @@ const Signup: React.FC = () => {
       if (signUpError) throw signUpError;
 
       if (data.user) {
+        if (locationIds.length === 0) {
+          setError('Selecciona al menos un local.');
+          setLoading(false);
+          return;
+        }
+
+        const primaryLocationId = locationIds[0];
         const { error: profileError } = await supabase
           .from('employees')
           .insert([{
             id: data.user.id,
             name: name,
             role: role,
-            location_id: locationId || null
+            location_id: primaryLocationId || null
           }]);
 
         if (profileError) throw profileError;
 
-        alert("¡Registro exitoso! Ya puedes iniciar sesión.");
-        navigate('/login');
-      }
+        if (locationIds.length > 0) {
+          const { error: linkError } = await supabase
+            .from('employee_locations')
+            .insert(locationIds.map((locId) => ({
+              employee_id: data.user.id,
+              location_id: locId
+            })));
+          if (linkError) throw linkError;
+        }
+
+          alert("¡Registro exitoso! Ya puedes iniciar sesión.");
+          navigate('/login');
+        }
     } catch (err: any) {
       setError(err.message || "Ocurrió un error inesperado.");
     } finally {
@@ -144,26 +159,32 @@ const Signup: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Local</label>
-            <div className="relative">
-              <select
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-                className="w-full h-14 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm focus:ring-primary text-lg font-bold appearance-none cursor-pointer pr-10 bg-none"
-                required
-              >
-                <option value="" disabled>Selecciona tu local</option>
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Locales</label>
+            <div className="grid grid-cols-2 gap-2">
+              {locations.map((loc) => {
+                const selected = locationIds.includes(loc.id);
+                return (
+                  <button
+                    key={loc.id}
+                    type="button"
+                    onClick={() =>
+                      setLocationIds((prev) =>
+                        prev.includes(loc.id)
+                          ? prev.filter((id) => id !== loc.id)
+                          : [...prev, loc.id]
+                      )
+                    }
+                    className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                  >
+                    {loc.name}
+                  </button>
+                );
+              })}
             </div>
+            {locations.length === 0 && (
+              <div className="text-xs font-bold text-gray-400">Sin locales disponibles</div>
+            )}
           </div>
 
           <div className="space-y-1">

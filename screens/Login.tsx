@@ -70,6 +70,7 @@ const Login: React.FC = () => {
     }
   };
 
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background-light dark:bg-background-dark max-w-md mx-auto">
       <div className="w-full space-y-8 animate-appear">
@@ -106,11 +107,13 @@ const Login: React.FC = () => {
             />
           </div>
 
+
           {error && (
             <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 text-sm font-bold">
               {error}
             </div>
           )}
+
 
           <button 
             type="submit"

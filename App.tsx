@@ -21,7 +21,7 @@ const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
   const [initialized, setInitialized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [employeeLocation, setEmployeeLocation] = useState<string | null>(null);
+  const [employeeLocations, setEmployeeLocations] = useState<string[]>([]);
 
   // Email exacto proporcionado para acceso de gestión
   const ADMIN_EMAIL = 'brutal.soul.25@gmail.com';
@@ -54,18 +54,19 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchEmployeeLocation = async () => {
       if (!session?.user?.id) {
-        setEmployeeLocation(null);
+        setEmployeeLocations([]);
         return;
       }
 
       const { data } = await supabase
-        .from('employees')
-        .select('location_id, locations(name)')
-        .eq('id', session.user.id)
-        .maybeSingle();
+        .from('employee_locations')
+        .select('locations(name)')
+        .eq('employee_id', session.user.id);
 
-      const locationName = (data as any)?.locations?.name || null;
-      setEmployeeLocation(locationName);
+      const locationNames = (data || [])
+        .map((row: any) => row.locations?.name)
+        .filter(Boolean);
+      setEmployeeLocations(locationNames);
     };
 
     fetchEmployeeLocation();
@@ -117,7 +118,9 @@ const App: React.FC = () => {
 
                   <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-card border border-gray-100 dark:border-gray-800 mb-6">
                     <p className="text-xs font-bold text-gray-400 uppercase mb-1">Local Asignado</p>
-                    <p className="font-black text-lg">{employeeLocation || 'Sin asignar'}</p>
+                    <p className="font-black text-lg">
+                      {employeeLocations.length > 0 ? employeeLocations.join(', ') : 'Sin asignar'}
+                    </p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase mt-2">Solo lectura</p>
                   </div>
 

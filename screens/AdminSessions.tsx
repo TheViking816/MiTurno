@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabaseService';
+import { supabase, supabaseService } from '../services/supabaseService';
 
 type EmployeeRow = {
   id: string;
@@ -76,9 +76,12 @@ const AdminSessions: React.FC = () => {
           return;
         }
 
+        const employeeIds = await supabaseService.getEmployeeIdsByLocation(selectedLocation);
         const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
           await Promise.all([
-            supabase.from('employees').select('id, name').eq('location_id', selectedLocation),
+            employeeIds.length
+              ? supabase.from('employees').select('id, name').in('id', employeeIds)
+              : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
             supabase
               .from('sessions')
               .select('id, user_id, clock_in, clock_out, location_id')

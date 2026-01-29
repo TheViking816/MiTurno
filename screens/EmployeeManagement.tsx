@@ -18,6 +18,7 @@ const EmployeeManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [employeeLocations, setEmployeeLocations] = useState<Record<string, string[]>>({});
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -31,6 +32,21 @@ const EmployeeManagement: React.FC = () => {
       // Ordenar localmente por nombre
       const sorted = (data || []).sort((a, b) => a.name.localeCompare(b.name));
       setEmployees(sorted);
+      const employeeIds = sorted.map((emp) => emp.id).filter(Boolean);
+      if (employeeIds.length > 0) {
+        const { data: linkData } = await supabase
+          .from('employee_locations')
+          .select('employee_id, location_id')
+          .in('employee_id', employeeIds);
+        const map: Record<string, string[]> = {};
+        (linkData || []).forEach((row: any) => {
+          if (!map[row.employee_id]) map[row.employee_id] = [];
+          if (row.location_id) map[row.employee_id].push(row.location_id);
+        });
+        setEmployeeLocations(map);
+      } else {
+        setEmployeeLocations({});
+      }
     }
     setLoading(false);
   };
@@ -59,17 +75,22 @@ const EmployeeManagement: React.FC = () => {
     }
   };
 
-  const handleLocationChange = async (empId: string, newLocationId: string) => {
+  const handleLocationToggle = async (empId: string, locationId: string) => {
+    const current = new Set<string>(employeeLocations[empId] || []);
+    if (current.has(locationId)) {
+      current.delete(locationId);
+    } else {
+      current.add(locationId);
+    }
+    const next = Array.from(current);
+    setEmployeeLocations((prev) => ({ ...prev, [empId]: next }));
+
     setUpdatingId(empId);
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ location_id: newLocationId || null })
-        .eq('id', empId);
-      if (error) throw error;
-      setEmployees(prev => prev.map(emp => emp.id === empId ? { ...emp, location_id: newLocationId } : emp));
+      await supabaseService.setEmployeeLocations(empId, next);
     } catch (error) {
-      alert('Error al actualizar el local');
+      alert('Error al actualizar los locales');
+      fetchEmployees();
     } finally {
       setUpdatingId(null);
     }
@@ -157,21 +178,26 @@ const EmployeeManagement: React.FC = () => {
                 </div>
 
                 <div className="relative mt-2">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Local</label>
-                  <select
-                    value={emp.location_id || ''}
-                    disabled={updatingId === emp.id}
-                    onChange={(e) => handleLocationChange(emp.id, e.target.value)}
-                    className="w-full py-2 pl-3 pr-8 bg-gray-50 dark:bg-black/20 border-none rounded-xl text-xs font-black appearance-none cursor-pointer focus:ring-primary dark:text-white"
-                  >
-                    <option value="">Sin asignar</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 bottom-2 pointer-events-none text-primary">
-                    <span className="material-symbols-outlined text-sm">storefront</span>
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Locales</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {locations.map((loc) => {
+                      const selected = (employeeLocations[emp.id] || []).includes(loc.id);
+                      return (
+                        <button
+                          key={loc.id}
+                          type="button"
+                          disabled={updatingId === emp.id}
+                          onClick={() => handleLocationToggle(emp.id, loc.id)}
+                          className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                        >
+                          {loc.name}
+                        </button>
+                      );
+                    })}
                   </div>
+                  {locations.length === 0 && (
+                    <div className="text-xs font-bold text-gray-400">Sin locales disponibles</div>
+                  )}
                   {updatingId === emp.id && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">
                       <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>

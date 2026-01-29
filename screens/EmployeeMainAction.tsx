@@ -12,9 +12,13 @@ const EmployeeMainAction: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [allowedLocationIds, setAllowedLocationIds] = useState<string[]>([]);
+  const [employeeLocations, setEmployeeLocations] = useState<{ id: string; name: string }[]>([]);
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const userRef = useRef<any>(null);
   const sessionRef = useRef<WorkSession | null>(null);
+  const allowedLocationsRef = useRef<string[]>([]);
 
   useEffect(() => {
     userRef.current = user;
@@ -25,6 +29,10 @@ const EmployeeMainAction: React.FC = () => {
   }, [currentSession]);
 
   useEffect(() => {
+    allowedLocationsRef.current = allowedLocationIds;
+  }, [allowedLocationIds]);
+
+  useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -32,7 +40,7 @@ const EmployeeMainAction: React.FC = () => {
 
         const { data: profile } = await supabase
           .from('employees')
-          .select('id, location_id')
+          .select('id')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -42,6 +50,14 @@ const EmployeeMainAction: React.FC = () => {
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Empleado',
             role: 'Empleado'
           }]);
+        }
+
+        const locations = await supabaseService.getEmployeeLocations(user.id);
+        const locationIds = locations.map((loc) => loc.id);
+        setAllowedLocationIds(locationIds);
+        setEmployeeLocations(locations);
+        if (locations.length === 1) {
+          setSelectedLocationId(locations[0].id);
         }
 
         const session = await supabaseService.getCurrentSession(user.id);
@@ -84,14 +100,14 @@ const EmployeeMainAction: React.FC = () => {
             const activeUser = userRef.current;
             if (!activeUser) return;
 
-            const { data: profile } = await supabase
-              .from('employees')
-              .select('location_id')
-              .eq('id', activeUser.id)
-              .maybeSingle();
+            const allowedIds = allowedLocationsRef.current || [];
+            if (allowedIds.length > 0 && !allowedIds.includes(location.id)) {
+              setScanError('Este QR no corresponde a tus locales asignados.');
+              return;
+            }
 
-            if (profile?.location_id && profile.location_id !== location.id) {
-              setScanError('Este QR no corresponde a tu local asignado.');
+            if (selectedLocationId && selectedLocationId !== location.id) {
+              setScanError('El QR no coincide con el local seleccionado.');
               return;
             }
 
@@ -106,7 +122,8 @@ const EmployeeMainAction: React.FC = () => {
               console.error('Error al fichar:', error);
               alert('Error al registrar: Asegurate de tener conexion.');
             }
-          }
+          },
+          () => {}
         );
       } catch (error) {
         console.error('Error starting scanner:', error);
@@ -162,6 +179,11 @@ const EmployeeMainAction: React.FC = () => {
       return;
     }
 
+    if (employeeLocations.length > 1 && !selectedLocationId) {
+      setScanError('Selecciona tu local antes de escanear.');
+      return;
+    }
+
     setScanning(true);
   };
 
@@ -182,6 +204,28 @@ const EmployeeMainAction: React.FC = () => {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center z-10">
+        {employeeLocations.length > 1 && !currentSession && (
+          <div className="w-full mb-4">
+            <div className="bg-white dark:bg-surface-dark px-5 py-4 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-card">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Local</p>
+              <div className="grid grid-cols-2 gap-2">
+                {employeeLocations.map((loc) => {
+                  const selected = selectedLocationId === loc.id;
+                  return (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => setSelectedLocationId(loc.id)}
+                      className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                    >
+                      {loc.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
         {scanError && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold text-center">
             {scanError}

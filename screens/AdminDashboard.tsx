@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../services/supabaseService';
+import { supabase, supabaseService } from '../services/supabaseService';
 
 type EmployeeRow = {
   id: string;
@@ -21,6 +21,7 @@ const AdminDashboard: React.FC = () => {
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationRoster, setLocationRoster] = useState<{ id: string; name: string; count: number }[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [showActiveList, setShowActiveList] = useState(false);
@@ -45,10 +46,36 @@ const AdminDashboard: React.FC = () => {
       setLocations(locationsData || []);
       const selected = settings?.selected_location_id || locationsData?.[0]?.id || '';
       setSelectedLocationId(selected);
+      await fetchLocationRoster(locationsData || []);
     } catch (error) {
       console.error('Error loading locations:', error);
       setLocationError('No se pudieron cargar los locales.');
     }
+  };
+
+  const fetchLocationRoster = async (sourceLocations?: any[]) => {
+    const baseLocations = sourceLocations || locations;
+    if (!baseLocations.length) {
+      setLocationRoster([]);
+      return;
+    }
+
+    const { data: links } = await supabase
+      .from('employee_locations')
+      .select('location_id');
+
+    const counts = new Map<string, number>();
+    (links || []).forEach((row: any) => {
+      if (!row.location_id) return;
+      counts.set(row.location_id, (counts.get(row.location_id) || 0) + 1);
+    });
+
+    const roster = baseLocations.map((loc: any) => ({
+      id: loc.id,
+      name: loc.name,
+      count: counts.get(loc.id) || 0
+    }));
+    setLocationRoster(roster);
   };
 
   const fetchStats = async (locationId: string) => {
@@ -60,9 +87,12 @@ const AdminDashboard: React.FC = () => {
     }
     setLoading(true);
     try {
+      const employeeIds = await supabaseService.getEmployeeIdsByLocation(locationId);
       const [{ data: employeesData, error: empError }, { data: activeData, error: activeError }] =
         await Promise.all([
-          supabase.from('employees').select('id, name').eq('location_id', locationId),
+          employeeIds.length
+            ? supabase.from('employees').select('id, name').in('id', employeeIds)
+            : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
           supabase
             .from('sessions')
             .select('id, user_id, clock_in')
@@ -98,6 +128,7 @@ const AdminDashboard: React.FC = () => {
       .channel('schema-db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, () => fetchStats(selectedLocationId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'employees' }, () => fetchStats(selectedLocationId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_locations' }, () => fetchLocationRoster())
       .subscribe();
 
     return () => {
@@ -172,6 +203,24 @@ const AdminDashboard: React.FC = () => {
           <span className="text-4xl font-black text-text-main dark:text-white">{loading ? '...' : stats.total}</span>
           <span className="text-[10px] font-bold uppercase text-gray-400 mt-1">Plantilla</span>
         </button>
+      </div>
+
+      <div className="px-6 pb-4">
+        <div className="bg-white dark:bg-surface-dark rounded-3xl border border-gray-100 p-4 shadow-card">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Equipo por local</p>
+          <div className="space-y-2">
+            {locationRoster.length === 0 ? (
+              <p className="text-sm font-bold text-gray-400">No hay locales cargados.</p>
+            ) : (
+              locationRoster.map((loc) => (
+                <div key={loc.id} className="flex items-center justify-between">
+                  <span className="font-black">{loc.name}</span>
+                  <span className="text-xs font-bold text-gray-400">{loc.count} asignados</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {showActiveList && (
