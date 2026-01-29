@@ -10,6 +10,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [showInstall, setShowInstall] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
@@ -61,6 +62,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setResetMessage(null);
     
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     
@@ -68,6 +70,24 @@ const Login: React.FC = () => {
       setError('Credenciales inválidas. Revisa tus datos.');
       setLoading(false);
     }
+  };
+
+  const handlePasswordReset = async () => {
+    setError(null);
+    setResetMessage(null);
+
+    if (!email) {
+      setError('Escribe tu email para enviarte el enlace de recuperación.');
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      setError('No pudimos enviar el enlace. Revisa el email e intenta de nuevo.');
+      return;
+    }
+
+    setResetMessage('Revisa tu email para restablecer la contraseña.');
   };
 
 
@@ -107,10 +127,26 @@ const Login: React.FC = () => {
             />
           </div>
 
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={handlePasswordReset}
+              className="text-[10px] font-black uppercase tracking-widest text-primary"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
 
           {error && (
             <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-400 text-sm font-bold">
               {error}
+            </div>
+          )}
+
+          {resetMessage && (
+            <div className="p-4 bg-primary/10 border border-primary/20 rounded-2xl text-primary text-sm font-bold">
+              {resetMessage}
             </div>
           )}
 
