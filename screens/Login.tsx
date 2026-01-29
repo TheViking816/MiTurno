@@ -126,9 +126,10 @@ const Login: React.FC = () => {
             <button
               type="button"
               onClick={handleInstallClick}
-              className="w-full h-14 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-surface-dark text-text-main dark:text-white font-black text-sm tracking-wide shadow-sm active:scale-[0.98] transition-all"
+              className="w-full h-16 rounded-3xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/20 text-primary dark:text-white font-black text-sm tracking-wide shadow-sm active:scale-[0.98] transition-all"
             >
-              Descargar app
+              <span className="block text-sm">Instalar la app</span>
+              <span className="block text-[11px] font-semibold text-text-main/70 dark:text-white/80">Acceso rapido desde tu telefono</span>
             </button>
             {isIos && !deferredPrompt && (
               <p className="text-[11px] text-gray-400 font-medium text-center">
