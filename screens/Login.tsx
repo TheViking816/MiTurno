@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseService';
 import logoUrl from '../assets/logo.png';
@@ -10,6 +10,52 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showInstall, setShowInstall] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isIos, setIsIos] = useState(false);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobileDevice = /iphone|ipad|ipod|android/.test(userAgent);
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    setIsIos(/iphone|ipad|ipod/.test(userAgent));
+    setShowInstall(isMobileDevice && !isStandalone);
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setDeferredPrompt(event as BeforeInstallPromptEvent);
+    };
+
+    const handleAppInstalled = () => {
+      setShowInstall(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      return;
+    }
+
+    await deferredPrompt.prompt();
+    const choiceResult = await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+
+    if (choiceResult.outcome === 'accepted') {
+      setShowInstall(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +121,23 @@ const Login: React.FC = () => {
           </button>
         </form>
 
+        {showInstall && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="w-full h-14 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-surface-dark text-text-main dark:text-white font-black text-sm tracking-wide shadow-sm active:scale-[0.98] transition-all"
+            >
+              Descargar app
+            </button>
+            {isIos && !deferredPrompt && (
+              <p className="text-[11px] text-gray-400 font-medium text-center">
+                En iPhone, toca Compartir y luego "Añadir a pantalla de inicio".
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="text-center space-y-4">
           <p className="text-gray-400 text-sm font-medium">
             ¿No tienes cuenta? <button onClick={() => navigate('/signup')} className="text-primary font-black underline underline-offset-4">Regístrate aquí</button>
@@ -86,3 +149,8 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
