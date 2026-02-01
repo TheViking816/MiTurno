@@ -14,9 +14,10 @@ const ResetPassword: React.FC = () => {
 
     useEffect(() => {
         const handleAuth = async () => {
-            // 1. Verificar errores en la URL
+            // 1. Verificar errores en la URL (algunos vienen en search, otros en hash)
             const params = new URLSearchParams(window.location.search);
-            const hashParams = new URLSearchParams(window.location.hash.split('#').pop()?.split('?').pop());
+            const hash = window.location.hash.split('#').pop() || '';
+            const hashParams = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : hash);
 
             const errorMsg = params.get('error_description') || hashParams.get('error_description');
             if (errorMsg) {
@@ -25,30 +26,35 @@ const ResetPassword: React.FC = () => {
                 return;
             }
 
-            // 2. Tentar obtener sesión
+            // 2. Intentar capturar tokens manualmente si Supabase no los ve (Común en HashRouter)
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken && refreshToken) {
+                const { error: setSessionError } = await supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken,
+                });
+                if (!setSessionError) {
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 3. Tentar obtener sesión normal
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 setLoading(false);
                 return;
             }
 
-            // 3. Listener para cambios de auth (especialmente PASSWORD_RECOVERY)
+            // 4. Listener para cambios de auth
             const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log("Auth Event:", event);
                 if (event === 'PASSWORD_RECOVERY' || session) {
                     setLoading(false);
                     setError(null);
                 }
             });
-
-            // 4. Timeout de seguridad si no hay sesión
-            setTimeout(async () => {
-                const { data: { session: retrySession } } = await supabase.auth.getSession();
-                if (!retrySession) {
-                    setLoading(false);
-                    // No bloqueamos aquí, dejamos que intenten el cambio por si la sesión está en memoria
-                }
-            }, 2000);
 
             return () => subscription.unsubscribe();
         };
