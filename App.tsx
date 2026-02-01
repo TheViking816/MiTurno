@@ -16,6 +16,7 @@ import EmployeeManagement from './screens/EmployeeManagement';
 import AdminSessions from './screens/AdminSessions';
 import Settings from './screens/Settings';
 import ExportHours from './screens/ExportHours';
+import ResetPassword from './screens/ResetPassword';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -90,6 +91,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         ) : (
@@ -97,7 +99,7 @@ const App: React.FC = () => {
             <Routes>
               {/* Redirección inicial basada en el email de admin */}
               <Route path="/" element={isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/employee-main" replace />} />
-              
+
               {/* Rutas de Empleado */}
               <Route path="/employee-main" element={<EmployeeMainAction />} />
               <Route path="/clock-confirm" element={<ClockConfirm />} />
@@ -106,7 +108,7 @@ const App: React.FC = () => {
                 <div className="p-8 max-w-md mx-auto animate-appear">
                   <h1 className="text-3xl font-black mb-2">Mi Perfil</h1>
                   <p className="text-primary font-bold uppercase tracking-widest text-[10px] mb-8">Información de cuenta</p>
-                  
+
                   <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-card border border-gray-100 dark:border-gray-800 mb-6">
                     <p className="text-xs font-bold text-gray-400 uppercase mb-1">Email Conectado</p>
                     <p className="font-black text-lg break-all">{session.user.email}</p>
@@ -129,13 +131,13 @@ const App: React.FC = () => {
                       Ir al Panel de Gestión <span className="material-symbols-outlined font-black">admin_panel_settings</span>
                     </button>
                   )}
-                  
+
                   <button onClick={handleSignOut} className="w-full p-6 bg-red-50 dark:bg-red-900/10 text-red-600 rounded-3xl font-black text-left flex justify-between items-center transition-transform active:scale-95">
                     Cerrar Sesión <span className="material-symbols-outlined font-black">logout</span>
                   </button>
                 </div>
               } />
-              
+
               {/* Rutas de Administrador */}
               <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/employee-main" replace />} />
               <Route path="/incidences" element={isAdmin ? <Incidences /> : <Navigate to="/admin" replace />} />
@@ -143,10 +145,11 @@ const App: React.FC = () => {
               <Route path="/sessions" element={isAdmin ? <AdminSessions /> : <Navigate to="/admin" replace />} />
               <Route path="/settings" element={isAdmin ? <Settings /> : <Navigate to="/admin" replace />} />
               <Route path="/export" element={isAdmin ? <ExportHours /> : <Navigate to="/admin" replace />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            
+
             {isAdmin ? <BottomNavAdmin /> : <BottomNavEmployee />}
           </>
         )}

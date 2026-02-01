@@ -63,9 +63,9 @@ const Login: React.FC = () => {
     setLoading(true);
     setError(null);
     setResetMessage(null);
-    
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    
+
     if (error) {
       setError('Credenciales inválidas. Revisa tus datos.');
       setLoading(false);
@@ -81,9 +81,20 @@ const Login: React.FC = () => {
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Usamos el origen actual para asegurar que el enlace funcione tanto en local como en producción (o túneles)
+    const redirectTo = `${window.location.origin}/#/reset-password`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
     if (error) {
-      setError('No pudimos enviar el enlace. Revisa el email e intenta de nuevo.');
+      console.error('Error reset password:', error);
+      if (error.status === 429) {
+        setError('Demasiados intentos. Por favor, espera un minuto antes de volver a solicitarlo.');
+      } else {
+        setError('No pudimos enviar el enlace. Revisa el email e intenta de nuevo.');
+      }
       return;
     }
 
@@ -105,7 +116,7 @@ const Login: React.FC = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Email</label>
-            <input 
+            <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -117,7 +128,7 @@ const Login: React.FC = () => {
 
           <div className="space-y-1">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Contraseña</label>
-            <input 
+            <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -151,7 +162,7 @@ const Login: React.FC = () => {
           )}
 
 
-          <button 
+          <button
             type="submit"
             disabled={loading}
             className="w-full h-16 bg-text-main dark:bg-white text-white dark:text-text-main rounded-3xl font-black text-lg shadow-xl active:scale-[0.98] transition-all disabled:opacity-50"
