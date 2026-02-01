@@ -140,6 +140,19 @@ export const supabaseService = {
     if (error) throw error;
   },
 
+  addManualSession: async (session: { user_id: string, clock_in: string, clock_out: string, location_id: string }) => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert([{
+        ...session,
+        status: 'closed'
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   getHistory: async (userId: string) => {
     const { data } = await supabase
       .from('sessions')

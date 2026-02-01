@@ -40,11 +40,23 @@ const AdminSessions: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
 
+  // Manual Session State
+  const [showManual, setShowManual] = useState(false);
+  const [manualUserId, setManualUserId] = useState('');
+  const [manualIn, setManualIn] = useState('');
+  const [manualOut, setManualOut] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
+
   useEffect(() => {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     setStartDate(toInputDate(start));
     setEndDate(toInputDate(now));
+
+    // Default manual times to today
+    const nowLocal = toLocalInput(new Date().toISOString());
+    setManualIn(nowLocal);
+    setManualOut(nowLocal);
   }, []);
 
   const employeeMap = useMemo(() => new Map(employees.map((emp) => [emp.id, emp])), [employees]);
@@ -61,35 +73,35 @@ const AdminSessions: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-        const { data: settings } = await supabase
-          .from('app_settings')
-          .select('selected_location_id')
-          .eq('id', 1)
-          .maybeSingle();
-        const selectedLocation = settings?.selected_location_id || null;
-        setActiveLocationId(selectedLocation);
+      const { data: settings } = await supabase
+        .from('app_settings')
+        .select('selected_location_id')
+        .eq('id', 1)
+        .maybeSingle();
+      const selectedLocation = settings?.selected_location_id || null;
+      setActiveLocationId(selectedLocation);
 
-        if (!selectedLocation) {
-          setSessions([]);
-          setEmployees([]);
-          setLoading(false);
-          return;
-        }
+      if (!selectedLocation) {
+        setSessions([]);
+        setEmployees([]);
+        setLoading(false);
+        return;
+      }
 
-        const employeeIds = await supabaseService.getEmployeeIdsByLocation(selectedLocation);
-        const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
-          await Promise.all([
-            employeeIds.length
-              ? supabase.from('employees').select('id, name').in('id', employeeIds)
-              : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
-            supabase
-              .from('sessions')
-              .select('id, user_id, clock_in, clock_out, location_id')
-              .gte('clock_in', rangeStart.toISOString())
-              .lte('clock_in', rangeEnd.toISOString())
-              .eq('location_id', selectedLocation)
-              .order('clock_in', { ascending: false })
-          ]);
+      const employeeIds = await supabaseService.getEmployeeIdsByLocation(selectedLocation);
+      const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
+        await Promise.all([
+          employeeIds.length
+            ? supabase.from('employees').select('id, name').in('id', employeeIds)
+            : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
+          supabase
+            .from('sessions')
+            .select('id, user_id, clock_in, clock_out, location_id')
+            .gte('clock_in', rangeStart.toISOString())
+            .lte('clock_in', rangeEnd.toISOString())
+            .eq('location_id', selectedLocation)
+            .order('clock_in', { ascending: false })
+        ]);
 
       if (employeesError) throw employeesError;
       if (sessionsError) throw sessionsError;
@@ -112,6 +124,43 @@ const AdminSessions: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [startDate, endDate]);
+
+  const handleManualSave = async () => {
+    if (!manualUserId || !manualIn || !manualOut) {
+      setError('Por favor rellena todos los campos para el fichaje manual.');
+      return;
+    }
+    if (!activeLocationId) return;
+
+    setManualSaving(true);
+    setError(null);
+    try {
+      const clockIn = new Date(manualIn).toISOString();
+      const clockOut = new Date(manualOut).toISOString();
+
+      const newSession = await supabaseService.addManualSession({
+        user_id: manualUserId,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        location_id: activeLocationId
+      });
+
+      // Add to list if it matches range (optimistic add)
+      const mapped = {
+        ...newSession,
+        clockInLocal: toLocalInput(newSession.clock_in),
+        clockOutLocal: toLocalInput(newSession.clock_out)
+      };
+      setSessions(prev => [mapped, ...prev]);
+      setShowManual(false);
+      setManualUserId('');
+    } catch (err) {
+      console.error('Error saving manual session:', err);
+      setError('No se pudo guardar el fichaje manual.');
+    } finally {
+      setManualSaving(false);
+    }
+  };
 
   const handleSave = async (sessionId: string) => {
     setSessions((prev) =>
@@ -169,12 +218,73 @@ const AdminSessions: React.FC = () => {
     <div className="bg-background-light dark:bg-background-dark text-[#171412] dark:text-white font-display min-h-screen pb-32 max-w-md mx-auto">
       <div className="flex items-center px-6 py-6 justify-between sticky top-0 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md z-20">
         <h2 className="text-2xl font-black">Fichajes</h2>
-        <button onClick={() => navigate('/admin')} className="flex size-10 items-center justify-center rounded-full bg-white border border-gray-100 shadow-sm text-text-main">
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowManual(!showManual)}
+            className={`flex size-10 items-center justify-center rounded-full border shadow-sm transition-colors ${showManual ? 'bg-primary text-white border-primary' : 'bg-white text-text-main border-gray-100'}`}
+          >
+            <span className="material-symbols-outlined">{showManual ? 'close' : 'add'}</span>
+          </button>
+          <button onClick={() => navigate('/admin')} className="flex size-10 items-center justify-center rounded-full bg-white border border-gray-100 shadow-sm text-text-main">
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+        </div>
       </div>
 
       <div className="px-6 space-y-6 animate-appear">
+        {showManual && (
+          <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-xl border-2 border-primary/20 space-y-4 animate-in fade-in zoom-in duration-300">
+            <h3 className="text-lg font-black flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">person_add</span>
+              Fichaje Manual
+            </h3>
+
+            <div className="space-y-3">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Seleccionar Empleado</span>
+                <select
+                  value={manualUserId}
+                  onChange={(e) => setManualUserId(e.target.value)}
+                  className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 font-bold"
+                >
+                  <option value="">Selecciona un empleado...</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Hora de Entrada</span>
+                <input
+                  type="datetime-local"
+                  value={manualIn}
+                  onChange={(e) => setManualIn(e.target.value)}
+                  className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 font-bold"
+                />
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Hora de Salida</span>
+                <input
+                  type="datetime-local"
+                  value={manualOut}
+                  onChange={(e) => setManualOut(e.target.value)}
+                  className="w-full h-12 px-4 rounded-2xl bg-gray-50 dark:bg-black/20 border border-gray-100 font-bold"
+                />
+              </div>
+
+              <button
+                onClick={handleManualSave}
+                disabled={manualSaving}
+                className="w-full h-14 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {manualSaving ? 'Guardando...' : 'Crear Fichaje'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex flex-col min-w-0">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Desde</span>
