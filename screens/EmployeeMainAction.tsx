@@ -75,7 +75,7 @@ const EmployeeMainAction: React.FC = () => {
     let cancelled = false;
     const scanner = new Html5Qrcode('qr-reader');
     scannerRef.current = scanner;
-    setScanError(null);
+    let isProcessing = false;
 
     const start = async () => {
       try {
@@ -83,7 +83,9 @@ const EmployeeMainAction: React.FC = () => {
           { facingMode: 'environment' },
           { fps: 10, qrbox: 240 },
           async (decodedText) => {
-            if (cancelled) return;
+            if (cancelled || isProcessing) return;
+            isProcessing = true;
+
             const scannedToken = extractToken(decodedText);
 
             const { data: location } = await supabase
@@ -94,20 +96,26 @@ const EmployeeMainAction: React.FC = () => {
 
             if (!location) {
               setScanError('QR incorrecto. Usa el QR del local.');
+              isProcessing = false;
               return;
             }
 
             const activeUser = userRef.current;
-            if (!activeUser) return;
+            if (!activeUser) {
+              isProcessing = false;
+              return;
+            }
 
             const allowedIds = allowedLocationsRef.current || [];
             if (allowedIds.length > 0 && !allowedIds.includes(location.id)) {
               setScanError('Este QR no corresponde a tus locales asignados.');
+              isProcessing = false;
               return;
             }
 
             if (selectedLocationId && selectedLocationId !== location.id) {
               setScanError('El QR no coincide con el local seleccionado.');
+              isProcessing = false;
               return;
             }
 
@@ -121,9 +129,10 @@ const EmployeeMainAction: React.FC = () => {
             } catch (error) {
               console.error('Error al fichar:', error);
               alert('Error al registrar: Asegurate de tener conexion.');
+              isProcessing = false;
             }
           },
-          () => {}
+          () => { }
         );
       } catch (error) {
         console.error('Error starting scanner:', error);
@@ -253,7 +262,7 @@ const EmployeeMainAction: React.FC = () => {
         </div>
         <div className="flex items-center gap-3 mt-2 cursor-pointer p-2 bg-white/50 dark:bg-black/20 rounded-2xl" onClick={() => navigate('/profile')}>
           <div className="size-10 rounded-full overflow-hidden border-2 border-primary/20 bg-gray-100 flex items-center justify-center">
-             <span className="material-symbols-outlined text-gray-500">person</span>
+            <span className="material-symbols-outlined text-gray-500">person</span>
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-black text-text-main dark:text-white truncate max-w-[150px]">

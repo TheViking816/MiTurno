@@ -102,8 +102,21 @@ export const supabaseService = {
       .maybeSingle();
     return data;
   },
-  
+
   clockIn: async (userId: string, locationId?: string | null) => {
+    // Check for an existing open session first to prevent duplicates
+    const { data: existingSession } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .is('clock_out', null)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSession) {
+      return existingSession;
+    }
+
     const { data, error } = await supabase
       .from('sessions')
       .insert([{

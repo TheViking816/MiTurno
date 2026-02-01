@@ -162,17 +162,22 @@ const Login: React.FC = () => {
 
         {showInstall && (
           <div className="space-y-2">
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              className="w-full h-16 rounded-3xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/20 text-primary dark:text-white font-black text-sm tracking-wide shadow-sm active:scale-[0.98] transition-all"
-            >
-              <span className="block text-lg">Instalar app</span>
-            </button>
-            {isIos && !deferredPrompt && (
-              <p className="text-[11px] text-gray-400 font-medium text-center">
-                En iPhone, toca Compartir y luego "Añadir a pantalla de inicio".
-              </p>
+            {!isIos && (
+              <button
+                type="button"
+                onClick={handleInstallClick}
+                className="w-full h-16 rounded-3xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/20 text-primary dark:text-white font-black text-sm tracking-wide shadow-sm active:scale-[0.98] transition-all"
+              >
+                <span className="block text-lg">Instalar app</span>
+              </button>
+            )}
+            {isIos && (
+              <div className="w-full rounded-3xl border border-primary/30 dark:border-primary/40 bg-primary/10 dark:bg-primary/20 p-4 text-primary dark:text-white font-black text-sm tracking-wide text-center">
+                <span className="block text-lg">Instalar en iPhone</span>
+                <p className="mt-1 text-[11px] text-gray-400 font-medium">
+                  Toca Compartir y luego "Añadir a pantalla de inicio".
+                </p>
+              </div>
             )}
           </div>
         )}
