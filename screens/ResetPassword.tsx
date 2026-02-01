@@ -13,39 +13,47 @@ const ResetPassword: React.FC = () => {
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
-        // 1. Verificar si hay errores en la URL (algunos proveedores de email rompen el enlace)
-        const hash = window.location.hash;
-        if (hash.includes('error=access_denied') || hash.includes('error_code=otp_expired')) {
-            setError('El enlace ha expirado o ya ha sido utilizado. Por favor, solicita uno nuevo.');
-            return;
-        }
+        const handleAuth = async () => {
+            // 1. Verificar errores en la URL
+            const params = new URLSearchParams(window.location.search);
+            const hashParams = new URLSearchParams(window.location.hash.split('#').pop()?.split('?').pop());
 
-        // 2. Verificar sesión actual
-        const checkSession = async () => {
+            const errorMsg = params.get('error_description') || hashParams.get('error_description');
+            if (errorMsg) {
+                setError(errorMsg.replace(/\+/g, ' '));
+                setLoading(false);
+                return;
+            }
+
+            // 2. Tentar obtener sesión
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 setLoading(false);
-            } else {
-                // Esperar un momento por si Supabase está procesando el fragmento de la URL
-                const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-                    if (event === 'PASSWORD_RECOVERY' || session) {
-                        setLoading(false);
-                        setError(null);
-                    } else {
-                        // Si después de 2 segundos no hay nada, dar error
-                        setTimeout(() => {
-                            if (!session) {
-                                setError('No se ha detectado una sesión de recuperación válida. Asegúrate de venir desde el enlace del correo.');
-                            }
-                        }, 2000);
-                    }
-                });
-
-                return () => subscription.unsubscribe();
+                return;
             }
+
+            // 3. Listener para cambios de auth (especialmente PASSWORD_RECOVERY)
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log("Auth Event:", event);
+                if (event === 'PASSWORD_RECOVERY' || session) {
+                    setLoading(false);
+                    setError(null);
+                }
+            });
+
+            // 4. Timeout de seguridad si no hay sesión
+            setTimeout(async () => {
+                const { data: { session: retrySession } } = await supabase.auth.getSession();
+                if (!retrySession) {
+                    setLoading(false);
+                    // No bloqueamos aquí, dejamos que intenten el cambio por si la sesión está en memoria
+                }
+            }, 2000);
+
+            return () => subscription.unsubscribe();
         };
 
-        checkSession();
+        handleAuth();
     }, []);
 
     const handleResetPassword = async (e: React.FormEvent) => {
@@ -58,14 +66,18 @@ const ResetPassword: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.updateUser({ password });
+        // Intentamos actualizar la contraseña
+        const { error: updateError } = await supabase.auth.updateUser({ password });
 
-        if (error) {
-            setError('No pudimos actualizar la contraseña. El enlace puede haber expirado.');
+        if (updateError) {
+            console.error('Update Error:', updateError);
+            setError(updateError.message || 'Error al actualizar. El enlace puede haber expirado.');
             setLoading(false);
         } else {
             setSuccess(true);
             setLoading(false);
+            // Cerrar sesión después de cambiar contraseña para forzar nuevo login limpio
+            await supabase.auth.signOut();
             setTimeout(() => navigate('/login'), 3000);
         }
     };
