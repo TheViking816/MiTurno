@@ -13,20 +13,38 @@ const ResetPassword: React.FC = () => {
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
-        // Verificar si hay una sesión activa (que debería haberla si vienen del enlace de recuperación)
+        // 1. Verificar si hay errores en la URL (algunos proveedores de email rompen el enlace)
+        const hash = window.location.hash;
+        if (hash.includes('error=access_denied') || hash.includes('error_code=otp_expired')) {
+            setError('El enlace ha expirado o ya ha sido utilizado. Por favor, solicita uno nuevo.');
+            return;
+        }
+
+        // 2. Verificar sesión actual
         const checkSession = async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                // Si no hay sesión, puede ser que el enlace sea inválido o haya expirado
-                // Pero esperamos un poco por si Supabase está procesando el hash
-                setTimeout(async () => {
-                    const { data: { session: retrySession } } = await supabase.auth.getSession();
-                    if (!retrySession) {
-                        setError('No hay una sesión activa. El enlace de recuperación puede haber expirado o ser inválido.');
+            if (session) {
+                setLoading(false);
+            } else {
+                // Esperar un momento por si Supabase está procesando el fragmento de la URL
+                const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                    if (event === 'PASSWORD_RECOVERY' || session) {
+                        setLoading(false);
+                        setError(null);
+                    } else {
+                        // Si después de 2 segundos no hay nada, dar error
+                        setTimeout(() => {
+                            if (!session) {
+                                setError('No se ha detectado una sesión de recuperación válida. Asegúrate de venir desde el enlace del correo.');
+                            }
+                        }, 2000);
                     }
-                }, 1500);
+                });
+
+                return () => subscription.unsubscribe();
             }
         };
+
         checkSession();
     }, []);
 
