@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase, supabaseService } from '../services/supabaseService';
 
 type EmployeeRow = {
@@ -43,6 +45,7 @@ const AdminSessions: React.FC = () => {
   // Manual Session State
   const [showManual, setShowManual] = useState(false);
   const [manualUserId, setManualUserId] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [manualIn, setManualIn] = useState('');
   const [manualOut, setManualOut] = useState('');
   const [manualSaving, setManualSaving] = useState(false);
@@ -60,6 +63,77 @@ const AdminSessions: React.FC = () => {
   }, []);
 
   const employeeMap = useMemo(() => new Map(employees.map((emp) => [emp.id, emp])), [employees]);
+
+  // Filter sessions by selected employee
+  const filteredSessions = useMemo(() => {
+    if (!selectedEmployeeId) return sessions;
+    return sessions.filter((session) => session.user_id === selectedEmployeeId);
+  }, [sessions, selectedEmployeeId]);
+
+  // Format hours helper
+  const formatHours = (hours: number) => hours.toFixed(2).replace('.', ',');
+
+  // PDF export function
+  const handleExportPdf = () => {
+    if (!startDate || !endDate) return;
+    const rangeStart = new Date(`${startDate}T00:00:00`);
+    const rangeEnd = new Date(`${endDate}T23:59:59.999`);
+    const doc = new jsPDF();
+    const rangeLabel = `${rangeStart.toLocaleDateString('es-ES')} - ${rangeEnd.toLocaleDateString('es-ES')}`;
+
+    // Title and range
+    doc.setFontSize(16);
+    doc.text('Registro de Fichajes', 14, 18);
+    doc.setFontSize(11);
+    doc.text(`Rango: ${rangeLabel}`, 14, 26);
+
+    // If filtering by employee, show employee name
+    if (selectedEmployeeId) {
+      const emp = employeeMap.get(selectedEmployeeId);
+      doc.text(`Empleado: ${emp?.name || 'Sin nombre'}`, 14, 33);
+    }
+
+    // Calculate total hours
+    const now = new Date();
+    const totalHours = filteredSessions.reduce((sum, session) => {
+      const clockIn = new Date(session.clock_in);
+      const rawOut = session.clock_out ? new Date(session.clock_out) : now;
+      const effectiveOut = rawOut > rangeEnd ? rangeEnd : rawOut;
+      const durationMs = Math.max(0, effectiveOut.getTime() - clockIn.getTime());
+      return sum + durationMs / 36e5;
+    }, 0);
+
+    doc.text(`Total horas: ${formatHours(totalHours)}h`, 14, selectedEmployeeId ? 40 : 33);
+
+    // Detail table
+    const detailRows = filteredSessions.map((session) => {
+      const emp = employeeMap.get(session.user_id);
+      const clockIn = new Date(session.clock_in);
+      const rawOut = session.clock_out ? new Date(session.clock_out) : now;
+      const effectiveOut = rawOut > rangeEnd ? rangeEnd : rawOut;
+      const durationMs = Math.max(0, effectiveOut.getTime() - clockIn.getTime());
+      const durationHours = durationMs / 36e5;
+      const clockOutLabel = session.clock_out
+        ? new Date(session.clock_out).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        : 'En curso';
+      return [
+        emp?.name || 'Sin nombre',
+        clockIn.toLocaleDateString('es-ES'),
+        clockIn.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        clockOutLabel,
+        `${formatHours(durationHours)}h`
+      ];
+    });
+
+    autoTable(doc, {
+      startY: selectedEmployeeId ? 48 : 40,
+      head: [['Empleado', 'Fecha', 'Entrada', 'Salida', 'Horas']],
+      body: detailRows.length ? detailRows : [['Sin registros', '-', '-', '-', '0,00h']]
+    });
+
+    const empName = selectedEmployeeId ? employeeMap.get(selectedEmployeeId)?.name?.replace(/\s+/g, '_') || 'empleado' : 'todos';
+    doc.save(`fichajes-${empName}-${startDate}-a-${endDate}.pdf`);
+  };
 
   const fetchData = async () => {
     if (!startDate || !endDate) return;
@@ -306,6 +380,31 @@ const AdminSessions: React.FC = () => {
           </div>
         </div>
 
+        {/* Employee filter */}
+        <div className="flex flex-col mt-4">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 pl-1">Filtrar por Trabajador</span>
+          <select
+            value={selectedEmployeeId}
+            onChange={(e) => setSelectedEmployeeId(e.target.value)}
+            className="w-full h-12 px-4 rounded-2xl bg-white dark:bg-surface-dark border border-gray-100 shadow-sm font-bold"
+          >
+            <option value="">Todos los empleados</option>
+            {employees.map(emp => (
+              <option key={emp.id} value={emp.id}>{emp.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* PDF Export button */}
+        <button
+          onClick={handleExportPdf}
+          disabled={loading || !startDate || !endDate}
+          className="w-full h-14 mt-4 bg-stone-800 dark:bg-stone-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-xl">picture_as_pdf</span>
+          {loading ? 'Cargando...' : 'Descargar PDF'}
+        </button>
+
         {activeLocationId === null && (
           <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-700 text-sm font-bold">
             Selecciona un local activo en el panel de administrador.
@@ -323,13 +422,13 @@ const AdminSessions: React.FC = () => {
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p className="font-bold uppercase tracking-widest text-[10px]">Cargando fichajes...</p>
           </div>
-        ) : sessions.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <div className="text-center py-20 bg-white dark:bg-surface-dark rounded-[2.5rem] border border-dashed border-gray-200">
             <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">event_busy</span>
             <p className="text-gray-400 font-bold text-sm uppercase">No hay fichajes en el rango</p>
           </div>
         ) : (
-          sessions.map((session) => {
+          filteredSessions.map((session) => {
             const employee = employeeMap.get(session.user_id);
             return (
               <div key={session.id} className="bg-white dark:bg-surface-dark p-4 rounded-3xl shadow-card border border-gray-50 dark:border-gray-800 space-y-3">
