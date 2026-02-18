@@ -131,13 +131,24 @@ export const supabaseService = {
     return data;
   },
 
-  clockOut: async (userId: string) => {
-    const { error } = await supabase
+  clockOut: async (userId: string, sessionId?: string) => {
+    const targetSessionId = sessionId || (await supabaseService.getCurrentSession(userId))?.id;
+    if (!targetSessionId) {
+      throw new Error('No hay una jornada abierta para cerrar.');
+    }
+
+    const { data, error } = await supabase
       .from('sessions')
       .update({ clock_out: new Date().toISOString(), status: 'closed' })
+      .eq('id', targetSessionId)
       .eq('user_id', userId)
-      .is('clock_out', null);
+      .is('clock_out', null)
+      .select('id')
+      .maybeSingle();
     if (error) throw error;
+    if (!data) {
+      throw new Error('No se pudo cerrar la jornada. Recarga e inténtalo de nuevo.');
+    }
   },
 
   addManualSession: async (session: { user_id: string, clock_in: string, clock_out: string, location_id: string }) => {

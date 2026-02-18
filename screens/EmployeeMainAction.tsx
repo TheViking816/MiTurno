@@ -12,6 +12,7 @@ const EmployeeMainAction: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [clockActionBusy, setClockActionBusy] = useState(false);
   const [allowedLocationIds, setAllowedLocationIds] = useState<string[]>([]);
   const [employeeLocations, setEmployeeLocations] = useState<{ id: string; name: string }[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
@@ -174,16 +175,19 @@ const EmployeeMainAction: React.FC = () => {
   };
 
   const handleClockAction = async () => {
-    if (!user) return;
+    if (!user || clockActionBusy) return;
 
     if (currentSession) {
+      setClockActionBusy(true);
       try {
-        await supabaseService.clockOut(user.id);
+        await supabaseService.clockOut(user.id, currentSession.id);
         setCurrentSession(null);
         navigate('/clock-confirm', { state: { type: 'OUT' } });
       } catch (error) {
         console.error('Error al fichar:', error);
         alert('Error al registrar: Asegurate de tener conexion.');
+      } finally {
+        setClockActionBusy(false);
       }
       return;
     }
@@ -242,6 +246,7 @@ const EmployeeMainAction: React.FC = () => {
         )}
         <button
           onClick={handleClockAction}
+          disabled={clockActionBusy}
           className={`relative w-full aspect-square max-w-[280px] text-white rounded-full flex flex-col items-center justify-center gap-4 shadow-2xl transition-all border-[10px] border-white dark:border-zinc-800 ring-4 active:scale-95 ${currentSession ? 'bg-danger ring-danger/30' : 'bg-action-green ring-action-green/30'}`}
         >
           <span className="material-symbols-outlined text-[90px] font-light">
