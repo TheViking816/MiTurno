@@ -12,7 +12,6 @@ export type AppSettingsRow = {
   id: number;
   business_name: string | null;
   opening_time: string | null;
-  max_hours: number | null;
   morning_auto_close_time: string | null;
   afternoon_auto_close_time: string | null;
   auto_close_enabled: boolean | null;
@@ -113,7 +112,7 @@ export const supabaseService = {
   getAppSettings: async () => {
     const { data, error } = await supabase
       .from('app_settings')
-      .select('id, business_name, opening_time, max_hours, morning_auto_close_time, afternoon_auto_close_time, auto_close_enabled')
+      .select('id, business_name, opening_time, morning_auto_close_time, afternoon_auto_close_time, auto_close_enabled')
       .eq('id', 1)
       .maybeSingle<AppSettingsRow>();
     if (error) throw error;

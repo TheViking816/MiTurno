@@ -9,7 +9,6 @@ type AppSettings = {
   id: number;
   business_name: string | null;
   opening_time: string | null;
-  max_hours: number | null;
   morning_auto_close_time: string | null;
   afternoon_auto_close_time: string | null;
   auto_close_enabled: boolean | null;
@@ -25,7 +24,6 @@ const Settings: React.FC = () => {
   const navigate = useNavigate();
   const [businessName, setBusinessName] = useState('');
   const [openingTime, setOpeningTime] = useState('08:00');
-  const [maxHours, setMaxHours] = useState(12);
   const [morningAutoCloseTime, setMorningAutoCloseTime] = useState('17:00');
   const [afternoonAutoCloseTime, setAfternoonAutoCloseTime] = useState('01:00');
   const [autoCloseEnabled, setAutoCloseEnabled] = useState(true);
@@ -46,7 +44,6 @@ const Settings: React.FC = () => {
         if (data) {
           setBusinessName(data.business_name || '');
           setOpeningTime(data.opening_time || '08:00');
-          setMaxHours(data.max_hours ?? 12);
           setMorningAutoCloseTime(data.morning_auto_close_time || '17:00');
           setAfternoonAutoCloseTime(data.afternoon_auto_close_time || '01:00');
           setAutoCloseEnabled(data.auto_close_enabled ?? true);
@@ -80,7 +77,6 @@ const Settings: React.FC = () => {
         id: 1,
         business_name: businessName.trim(),
         opening_time: openingTime,
-        max_hours: maxHours,
         morning_auto_close_time: morningAutoCloseTime,
         afternoon_auto_close_time: afternoonAutoCloseTime,
         auto_close_enabled: autoCloseEnabled
@@ -199,36 +195,6 @@ const Settings: React.FC = () => {
                 onChange={(e) => setOpeningTime(e.target.value)}
                 className="font-black text-xl bg-transparent text-right outline-none"
               />
-            </div>
-            <div className="p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-orange-50 text-orange-600">
-                  <span className="material-symbols-outlined font-bold">hourglass_top</span>
-                </div>
-                <span className="font-bold">Limite Maximo</span>
-              </div>
-              <div className="flex items-center bg-gray-50 dark:bg-black/20 rounded-2xl p-1 gap-2">
-                <button
-                  onClick={() => setMaxHours((prev) => Math.max(1, prev - 1))}
-                  className="size-10 flex items-center justify-center font-black text-xl"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  min={1}
-                  max={24}
-                  value={maxHours}
-                  onChange={(e) => setMaxHours(Number(e.target.value))}
-                  className="w-16 text-center font-black text-lg bg-transparent outline-none"
-                />
-                <button
-                  onClick={() => setMaxHours((prev) => Math.min(24, prev + 1))}
-                  className="size-10 flex items-center justify-center font-black text-xl"
-                >
-                  +
-                </button>
-              </div>
             </div>
             <div className="p-5 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
