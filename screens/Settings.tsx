@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
-import { supabase } from '../services/supabaseService';
+import { supabase, supabaseService } from '../services/supabaseService';
 
 type AppSettings = {
   id: number;
   business_name: string | null;
   opening_time: string | null;
   max_hours: number | null;
+  morning_auto_close_time: string | null;
+  afternoon_auto_close_time: string | null;
+  auto_close_enabled: boolean | null;
 };
 
 type LocationRow = {
@@ -23,6 +26,9 @@ const Settings: React.FC = () => {
   const [businessName, setBusinessName] = useState('');
   const [openingTime, setOpeningTime] = useState('08:00');
   const [maxHours, setMaxHours] = useState(12);
+  const [morningAutoCloseTime, setMorningAutoCloseTime] = useState('17:00');
+  const [afternoonAutoCloseTime, setAfternoonAutoCloseTime] = useState('01:00');
+  const [autoCloseEnabled, setAutoCloseEnabled] = useState(true);
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,16 +42,14 @@ const Settings: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: fetchError } = await supabase
-          .from('app_settings')
-          .select('id, business_name, opening_time, max_hours')
-          .eq('id', 1)
-          .maybeSingle<AppSettings>();
-        if (fetchError) throw fetchError;
+        const data = await supabaseService.getAppSettings();
         if (data) {
           setBusinessName(data.business_name || '');
           setOpeningTime(data.opening_time || '08:00');
           setMaxHours(data.max_hours ?? 12);
+          setMorningAutoCloseTime(data.morning_auto_close_time || '17:00');
+          setAfternoonAutoCloseTime(data.afternoon_auto_close_time || '01:00');
+          setAutoCloseEnabled(data.auto_close_enabled ?? true);
         }
 
         const { data: locationsData } = await supabase
@@ -72,18 +76,15 @@ const Settings: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      const { error: saveError } = await supabase
-        .from('app_settings')
-        .upsert(
-          {
-            id: 1,
-            business_name: businessName.trim(),
-            opening_time: openingTime,
-            max_hours: maxHours
-          },
-          { onConflict: 'id' }
-        );
-      if (saveError) throw saveError;
+      await supabaseService.saveAppSettings({
+        id: 1,
+        business_name: businessName.trim(),
+        opening_time: openingTime,
+        max_hours: maxHours,
+        morning_auto_close_time: morningAutoCloseTime,
+        afternoon_auto_close_time: afternoonAutoCloseTime,
+        auto_close_enabled: autoCloseEnabled
+      });
       setSuccess('Ajustes guardados.');
     } catch (err: any) {
       console.error('Error saving settings:', err);
@@ -228,6 +229,54 @@ const Settings: React.FC = () => {
                   +
                 </button>
               </div>
+            </div>
+            <div className="p-5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600">
+                  <span className="material-symbols-outlined font-bold">alarm_on</span>
+                </div>
+                <div>
+                  <span className="font-bold block">Autocierre</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cerrar jornadas abiertas segun turno</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoCloseEnabled((prev) => !prev)}
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${autoCloseEnabled ? 'bg-primary' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${autoCloseEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+            <div className="p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-amber-50 text-amber-600">
+                  <span className="material-symbols-outlined font-bold">wb_sunny</span>
+                </div>
+                <span className="font-bold">Cierre turno manana</span>
+              </div>
+              <input
+                type="time"
+                value={morningAutoCloseTime}
+                onChange={(e) => setMorningAutoCloseTime(e.target.value)}
+                disabled={!autoCloseEnabled}
+                className="font-black text-xl bg-transparent text-right outline-none disabled:opacity-40"
+              />
+            </div>
+            <div className="p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-indigo-50 text-indigo-600">
+                  <span className="material-symbols-outlined font-bold">bedtime</span>
+                </div>
+                <span className="font-bold">Cierre turno tarde</span>
+              </div>
+              <input
+                type="time"
+                value={afternoonAutoCloseTime}
+                onChange={(e) => setAfternoonAutoCloseTime(e.target.value)}
+                disabled={!autoCloseEnabled}
+                className="font-black text-xl bg-transparent text-right outline-none disabled:opacity-40"
+              />
             </div>
           </div>
         </section>

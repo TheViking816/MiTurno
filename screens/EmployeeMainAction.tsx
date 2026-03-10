@@ -49,7 +49,8 @@ const EmployeeMainAction: React.FC = () => {
           await supabase.from('employees').insert([{
             id: user.id,
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Nuevo Empleado',
-            role: 'Empleado'
+            role: 'Empleado',
+            shift_type: 'morning'
           }]);
         }
 

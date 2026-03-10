@@ -11,6 +11,16 @@ const ROLES = [
   'Otros'
 ];
 
+const SHIFTS = [
+  { value: 'morning', label: 'Manana' },
+  { value: 'afternoon', label: 'Tarde' }
+] as const;
+
+const shiftLabel = (value?: string | null) => {
+  if (value === 'afternoon') return 'Tarde';
+  return 'Manana';
+};
+
 const EmployeeManagement: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<any[]>([]);
@@ -96,6 +106,18 @@ const EmployeeManagement: React.FC = () => {
     }
   };
 
+  const handleShiftChange = async (empId: string, shiftType: 'morning' | 'afternoon') => {
+    setUpdatingId(empId);
+    try {
+      await supabaseService.updateEmployeeShift(empId, shiftType);
+      setEmployees((prev) => prev.map((emp) => (emp.id === empId ? { ...emp, shift_type: shiftType } : emp)));
+    } catch (error) {
+      alert('Error al actualizar el turno');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const handleDelete = async (empId: string, empName: string) => {
     if (!confirm(`Eliminar a ${empName || 'este usuario'}?`)) return;
     setDeletingId(empId);
@@ -144,6 +166,7 @@ const EmployeeManagement: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-lg truncate">{emp.name || 'Sin nombre'}</p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{emp.is_active !== false ? 'Activo' : 'Inactivo'}</p>
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">{shiftLabel(emp.shift_type)}</p>
                   </div>
                   <div className="shrink-0 flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${emp.is_active !== false ? 'bg-action-green' : 'bg-gray-300'}`}></div>
@@ -169,6 +192,31 @@ const EmployeeManagement: React.FC = () => {
                   </select>
                   <div className="absolute right-3 bottom-2 pointer-events-none text-primary">
                     <span className="material-symbols-outlined text-sm">edit</span>
+                  </div>
+                  {updatingId === emp.id && (
+                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative mt-2">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Turno</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SHIFTS.map((shift) => {
+                      const selected = (emp.shift_type || 'morning') === shift.value;
+                      return (
+                        <button
+                          key={shift.value}
+                          type="button"
+                          disabled={updatingId === emp.id}
+                          onClick={() => handleShiftChange(emp.id, shift.value)}
+                          className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                        >
+                          {shift.label}
+                        </button>
+                      );
+                    })}
                   </div>
                   {updatingId === emp.id && (
                     <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">

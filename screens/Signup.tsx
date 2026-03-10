@@ -12,12 +12,18 @@ const ROLES = [
   'Otros'
 ];
 
+const SHIFTS = [
+  { value: 'morning', label: 'Manana' },
+  { value: 'afternoon', label: 'Tarde' }
+] as const;
+
 const Signup: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState(ROLES[2]); // Default: Camarero
+  const [shiftType, setShiftType] = useState<(typeof SHIFTS)[number]['value']>('morning');
   const [locations, setLocations] = useState<any[]>([]);
   const [locationIds, setLocationIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -78,6 +84,7 @@ const Signup: React.FC = () => {
             id: data.user.id,
             name: name,
             role: role,
+            shift_type: shiftType,
             location_id: primaryLocationId || null
           }]);
 
@@ -156,6 +163,25 @@ const Signup: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 text-text-main dark:text-gray-400">Turno</label>
+            <div className="grid grid-cols-2 gap-2">
+              {SHIFTS.map((shift) => {
+                const selected = shiftType === shift.value;
+                return (
+                  <button
+                    key={shift.value}
+                    type="button"
+                    onClick={() => setShiftType(shift.value)}
+                    className={`px-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                  >
+                    {shift.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

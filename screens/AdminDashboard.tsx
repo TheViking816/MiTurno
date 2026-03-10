@@ -5,12 +5,18 @@ import { supabase, supabaseService } from '../services/supabaseService';
 type EmployeeRow = {
   id: string;
   name: string | null;
+  shift_type?: 'morning' | 'afternoon' | null;
 };
 
 type ActiveSession = {
   id: string;
   user_id: string;
   clock_in: string;
+};
+
+const shiftLabel = (value?: string | null) => {
+  if (value === 'afternoon') return 'Tarde';
+  return 'Manana';
 };
 
 const AdminDashboard: React.FC = () => {
@@ -91,7 +97,7 @@ const AdminDashboard: React.FC = () => {
       const [{ data: employeesData, error: empError }, { data: activeData, error: activeError }] =
         await Promise.all([
           employeeIds.length
-            ? supabase.from('employees').select('id, name').in('id', employeeIds)
+            ? supabase.from('employees').select('id, name, shift_type').in('id', employeeIds)
             : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
           supabase
             .from('sessions')
@@ -232,9 +238,14 @@ const AdminDashboard: React.FC = () => {
             ) : (
               activeSessions.map((session) => (
                 <div key={session.id} className="flex items-center justify-between">
-                  <span className="font-black">
-                    {employeeMap.get(session.user_id)?.name || 'Sin nombre'}
-                  </span>
+                  <div>
+                    <span className="font-black block">
+                      {employeeMap.get(session.user_id)?.name || 'Sin nombre'}
+                    </span>
+                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                      {shiftLabel(employeeMap.get(session.user_id)?.shift_type)}
+                    </span>
+                  </div>
                   <span className="text-xs font-bold text-gray-400">
                     {new Date(session.clock_in).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                   </span>
@@ -253,8 +264,11 @@ const AdminDashboard: React.FC = () => {
               <p className="text-sm font-bold text-gray-400">No hay empleados asignados.</p>
             ) : (
               employees.map((emp) => (
-                <div key={emp.id} className="font-black">
-                  {emp.name || 'Sin nombre'}
+                <div key={emp.id} className="flex items-center justify-between gap-3">
+                  <span className="font-black">{emp.name || 'Sin nombre'}</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
+                    {shiftLabel(emp.shift_type)}
+                  </span>
                 </div>
               ))
             )}

@@ -3,6 +3,7 @@ export interface Employee {
   id: string;
   name: string;
   role: string;
+  shift_type?: 'morning' | 'afternoon' | null;
   avatar_url?: string;
   is_active: boolean;
 }

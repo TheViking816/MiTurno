@@ -7,6 +7,17 @@ const AUTH_STORAGE_KEY = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-aut
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+export type EmployeeShiftType = 'morning' | 'afternoon';
+export type AppSettingsRow = {
+  id: number;
+  business_name: string | null;
+  opening_time: string | null;
+  max_hours: number | null;
+  morning_auto_close_time: string | null;
+  afternoon_auto_close_time: string | null;
+  auto_close_enabled: boolean | null;
+};
+
 export const clearAuthStorage = () => {
   try {
     localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -88,6 +99,31 @@ export const supabaseService = {
       .from('employees')
       .update({ role: newRole })
       .eq('id', employeeId);
+    if (error) throw error;
+  },
+
+  updateEmployeeShift: async (employeeId: string, shiftType: EmployeeShiftType) => {
+    const { error } = await supabase
+      .from('employees')
+      .update({ shift_type: shiftType })
+      .eq('id', employeeId);
+    if (error) throw error;
+  },
+
+  getAppSettings: async () => {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('id, business_name, opening_time, max_hours, morning_auto_close_time, afternoon_auto_close_time, auto_close_enabled')
+      .eq('id', 1)
+      .maybeSingle<AppSettingsRow>();
+    if (error) throw error;
+    return data;
+  },
+
+  saveAppSettings: async (settings: Partial<AppSettingsRow> & { id: number }) => {
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert(settings, { onConflict: 'id' });
     if (error) throw error;
   },
 
