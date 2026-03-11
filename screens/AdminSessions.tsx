@@ -147,6 +147,8 @@ const AdminSessions: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      const rangeStartIso = rangeStart.toISOString();
+      const rangeEndIso = rangeEnd.toISOString();
       const { data: settings } = await supabase
         .from('app_settings')
         .select('selected_location_id')
@@ -171,8 +173,8 @@ const AdminSessions: React.FC = () => {
           supabase
             .from('sessions')
             .select('id, user_id, clock_in, clock_out, location_id')
-            .gte('clock_in', rangeStart.toISOString())
-            .lte('clock_in', rangeEnd.toISOString())
+            .lte('clock_in', rangeEndIso)
+            .or(`clock_out.gte.${rangeStartIso},clock_out.is.null`)
             .eq('location_id', selectedLocation)
             .order('clock_in', { ascending: false })
         ]);
