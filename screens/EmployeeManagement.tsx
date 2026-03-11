@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, supabaseService } from '../services/supabaseService';
 
@@ -21,28 +21,70 @@ const shiftLabel = (value?: string | null) => {
   return 'Manana';
 };
 
+type ShiftFilter = 'all' | 'morning' | 'afternoon';
+
 const EmployeeManagement: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
+  const [activeLocationName, setActiveLocationName] = useState('');
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [employeeLocations, setEmployeeLocations] = useState<Record<string, string[]>>({});
+  const [shiftFilter, setShiftFilter] = useState<ShiftFilter>('all');
+
+  const filteredEmployees = useMemo(() => {
+    if (shiftFilter === 'all') return employees;
+    return employees.filter((emp) => (emp.shift_type || 'morning') === shiftFilter);
+  }, [employees, shiftFilter]);
 
   const fetchEmployees = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*');
-    
+    const { data: settings } = await supabase
+      .from('app_settings')
+      .select('selected_location_id')
+      .eq('id', 1)
+      .maybeSingle();
+
+    const selectedLocationId = settings?.selected_location_id || null;
+    setActiveLocationId(selectedLocationId);
+
+    if (!selectedLocationId) {
+      setEmployees([]);
+      setEmployeeLocations({});
+      setActiveLocationName('');
+      setLoading(false);
+      return;
+    }
+
+    const { data: employeeIdsData, error: employeeIdsError } = await supabase
+      .from('employee_locations')
+      .select('employee_id')
+      .eq('location_id', selectedLocationId);
+
+    if (employeeIdsError) {
+      console.error("Error fetching employee ids:", employeeIdsError);
+      setEmployees([]);
+      setEmployeeLocations({});
+      setLoading(false);
+      return;
+    }
+
+    const employeeIds = (employeeIdsData || []).map((row: any) => row.employee_id).filter(Boolean);
+    const { data, error } = employeeIds.length
+      ? await supabase
+          .from('employees')
+          .select('*')
+          .in('id', employeeIds)
+      : { data: [], error: null };
+
     if (error) {
       console.error("Error fetching employees:", error);
     } else {
-      // Ordenar localmente por nombre
       const sorted = (data || []).sort((a, b) => a.name.localeCompare(b.name));
       setEmployees(sorted);
-      const employeeIds = sorted.map((emp) => emp.id).filter(Boolean);
       if (employeeIds.length > 0) {
         const { data: linkData } = await supabase
           .from('employee_locations')
@@ -62,15 +104,25 @@ const EmployeeManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchEmployees();
     const fetchLocations = async () => {
       const { data } = await supabase
         .from('locations')
         .select('id, name')
         .order('name', { ascending: true });
-      setLocations(data || []);
+      const loadedLocations = data || [];
+      setLocations(loadedLocations);
+
+      const { data: settings } = await supabase
+        .from('app_settings')
+        .select('selected_location_id')
+        .eq('id', 1)
+        .maybeSingle();
+      const selectedLocationId = settings?.selected_location_id || null;
+      const activeLocation = loadedLocations.find((loc: any) => loc.id === selectedLocationId);
+      setActiveLocationName(activeLocation?.name || '');
     };
     fetchLocations();
+    fetchEmployees();
   }, []);
 
   const handleRoleChange = async (empId: string, newRole: string) => {
@@ -145,19 +197,50 @@ const EmployeeManagement: React.FC = () => {
       </div>
 
       <div className="px-6 space-y-6 animate-appear">
+        <div className="bg-white dark:bg-surface-dark p-4 rounded-3xl shadow-card border border-gray-50 dark:border-gray-800">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Local activo</p>
+          <p className="font-black text-lg">{activeLocationName || 'Sin local seleccionado'}</p>
+          {!activeLocationId && (
+            <p className="text-xs font-bold text-amber-600 mt-2">Selecciona un local activo en el panel de administrador.</p>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-surface-dark p-4 rounded-3xl shadow-card border border-gray-50 dark:border-gray-800">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Filtrar por turno</p>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { value: 'all', label: `Todos (${employees.length})` },
+              { value: 'morning', label: `Manana (${employees.filter((emp) => (emp.shift_type || 'morning') === 'morning').length})` },
+              { value: 'afternoon', label: `Tarde (${employees.filter((emp) => (emp.shift_type || 'morning') === 'afternoon').length})` }
+            ].map((filter) => {
+              const selected = shiftFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => setShiftFilter(filter.value as ShiftFilter)}
+                  className={`px-3 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex flex-col gap-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 gap-4 opacity-50">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <p className="font-bold uppercase tracking-widest text-[10px]">Cargando equipo...</p>
             </div>
-          ) : employees.length === 0 ? (
+          ) : filteredEmployees.length === 0 ? (
             <div className="text-center py-20 bg-white dark:bg-surface-dark rounded-[2.5rem] border border-dashed border-gray-200">
                <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">person_off</span>
-               <p className="text-gray-400 font-bold text-sm uppercase">No hay empleados registrados</p>
+               <p className="text-gray-400 font-bold text-sm uppercase">No hay empleados en ese turno</p>
             </div>
           ) : (
-            employees.map((emp) => (
+            filteredEmployees.map((emp) => (
               <div key={emp.id} className="flex flex-col gap-3 bg-white dark:bg-surface-dark p-4 rounded-3xl shadow-card border border-gray-50 dark:border-gray-800">
                 <div className="flex items-center gap-4">
                   <div className="rounded-full h-14 w-14 bg-primary/10 flex items-center justify-center text-primary font-black text-xl">

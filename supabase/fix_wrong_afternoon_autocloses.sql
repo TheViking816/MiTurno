@@ -18,7 +18,7 @@ with wrong_closures as (
     and s.status = 'closed'
     and s.notes = 'Cierre automatico por horario configurado'
     and s.clock_out is not null
-    and s.clock_out <= s.clock_in
+    and date(timezone('Europe/Madrid', s.clock_out)) = date(timezone('Europe/Madrid', s.clock_in))
 )
 update public.sessions s
 set clock_out = wrong_closures.corrected_clock_out
