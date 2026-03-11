@@ -63,21 +63,16 @@ begin
   with pending as (
     select
       s.id,
+      coalesce(e.shift_type, 'morning') as shift_type,
       case
         when coalesce(e.shift_type, 'morning') = 'afternoon' then
           (
-            date(timezone('Europe/Madrid', s.clock_in))
-            + case
-              when settings_row.afternoon_auto_close_time < time '12:00' then 1
-              else 0
-            end
-            + settings_row.afternoon_auto_close_time
-          )
+            date(timezone('Europe/Madrid', s.clock_in)) + 1
+          )::timestamp + settings_row.afternoon_auto_close_time
         else
           (
             date(timezone('Europe/Madrid', s.clock_in))
-            + settings_row.morning_auto_close_time
-          )
+          )::timestamp + settings_row.morning_auto_close_time
       end as target_close_local
     from public.sessions s
     join public.employees e on e.id = s.user_id
