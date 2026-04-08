@@ -5,12 +5,17 @@ import { supabase, supabaseService } from '../services/supabaseService';
 import { WorkSession } from '../types';
 import logoUrl from '../assets/logo.png';
 
+type ScanFeedback = {
+  title: string;
+  detail?: string;
+};
+
 const EmployeeMainAction: React.FC = () => {
   const navigate = useNavigate();
   const [currentSession, setCurrentSession] = useState<WorkSession | null>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<ScanFeedback | null>(null);
   const [scanning, setScanning] = useState(false);
   const [clockActionBusy, setClockActionBusy] = useState(false);
   const [allowedLocationIds, setAllowedLocationIds] = useState<string[]>([]);
@@ -32,6 +37,89 @@ const EmployeeMainAction: React.FC = () => {
   useEffect(() => {
     allowedLocationsRef.current = allowedLocationIds;
   }, [allowedLocationIds]);
+
+  const setScanFeedback = (title: string, detail?: string) => {
+    setScanError({ title, detail });
+  };
+
+  const getCameraStartErrorMessage = (error: unknown): ScanFeedback => {
+    const fallback: ScanFeedback = {
+      title: 'No se pudo iniciar la camara.',
+      detail: 'Prueba en Chrome o Safari, revisa el permiso de camara y vuelve a intentarlo.'
+    };
+
+    if (!error || typeof error !== 'object') {
+      return fallback;
+    }
+
+    const maybeError = error as { name?: string; message?: string };
+    const name = maybeError.name || '';
+    const message = (maybeError.message || '').toLowerCase();
+
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || message.includes('permission')) {
+      return {
+        title: 'Permiso de camara bloqueado.',
+        detail: 'Activa el acceso a la camara en el navegador del movil y vuelve a abrir Fichar.'
+      };
+    }
+
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || message.includes('no camera')) {
+      return {
+        title: 'No se encontro ninguna camara.',
+        detail: 'Comprueba que el movil tiene camara disponible y que ninguna app la esta ocupando.'
+      };
+    }
+
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return {
+        title: 'La camara esta ocupada.',
+        detail: 'Cierra otras apps que esten usando la camara y vuelve a intentarlo.'
+      };
+    }
+
+    if (name === 'NotSupportedError' || message.includes('secure') || message.includes('https')) {
+      return {
+        title: 'La camara requiere una conexion segura.',
+        detail: 'Abre la app desde una URL https y evita navegadores internos de WhatsApp o Instagram.'
+      };
+    }
+
+    return fallback;
+  };
+
+  const runCameraChecks = async (): Promise<ScanFeedback | null> => {
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+    if (!window.isSecureContext && !isLocalhost) {
+      return {
+        title: 'La camara requiere una conexion segura.',
+        detail: 'Abre la app desde una URL https y evita navegadores internos de WhatsApp o Instagram.'
+      };
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return {
+        title: 'Este navegador no permite abrir la camara.',
+        detail: 'Prueba desde Chrome en Android o Safari en iPhone.'
+      };
+    }
+
+    if ('permissions' in navigator && navigator.permissions?.query) {
+      try {
+        const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (permissionStatus.state === 'denied') {
+          return {
+            title: 'Permiso de camara bloqueado.',
+            detail: 'Activa el permiso de camara en los ajustes del navegador y vuelve a intentarlo.'
+          };
+        }
+      } catch {
+        // ignore unsupported permission queries
+      }
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -97,7 +185,7 @@ const EmployeeMainAction: React.FC = () => {
               .maybeSingle();
 
             if (!location) {
-              setScanError('QR incorrecto. Usa el QR del local.');
+              setScanFeedback('QR incorrecto.', 'Usa el QR oficial del local y comprueba que se vea completo en pantalla o en papel.');
               isProcessing = false;
               return;
             }
@@ -110,13 +198,13 @@ const EmployeeMainAction: React.FC = () => {
 
             const allowedIds = allowedLocationsRef.current || [];
             if (allowedIds.length > 0 && !allowedIds.includes(location.id)) {
-              setScanError('Este QR no corresponde a tus locales asignados.');
+              setScanFeedback('Este QR no corresponde a tus locales asignados.', 'Consulta con administracion si te falta acceso al local correcto.');
               isProcessing = false;
               return;
             }
 
             if (selectedLocationId && selectedLocationId !== location.id) {
-              setScanError('El QR no coincide con el local seleccionado.');
+              setScanFeedback('El QR no coincide con el local seleccionado.', 'Cambia el local elegido antes de escanear.');
               isProcessing = false;
               return;
             }
@@ -138,7 +226,8 @@ const EmployeeMainAction: React.FC = () => {
         );
       } catch (error) {
         console.error('Error starting scanner:', error);
-        setScanError('No se pudo iniciar la camara.');
+        const feedback = getCameraStartErrorMessage(error);
+        setScanError(feedback);
         setScanning(false);
         await stopScanner();
       }
@@ -194,7 +283,14 @@ const EmployeeMainAction: React.FC = () => {
     }
 
     if (employeeLocations.length > 1 && !selectedLocationId) {
-      setScanError('Selecciona tu local antes de escanear.');
+      setScanFeedback('Selecciona tu local antes de escanear.');
+      return;
+    }
+
+    setScanError(null);
+    const cameraCheckError = await runCameraChecks();
+    if (cameraCheckError) {
+      setScanError(cameraCheckError);
       return;
     }
 
@@ -241,8 +337,11 @@ const EmployeeMainAction: React.FC = () => {
           </div>
         )}
         {scanError && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-xs font-bold text-center">
-            {scanError}
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-center">
+            <p className="text-xs font-black uppercase tracking-wider">{scanError.title}</p>
+            {scanError.detail && (
+              <p className="mt-1 text-[11px] font-bold leading-relaxed text-red-500">{scanError.detail}</p>
+            )}
           </div>
         )}
         <button
