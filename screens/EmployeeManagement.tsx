@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, supabaseService } from '../services/supabaseService';
-import WeeklyScheduleEditor from '../components/WeeklyScheduleEditor';
 
 const ROLES = [
   'Jefe de cocina',
@@ -34,12 +33,14 @@ const EmployeeManagement: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [employeeLocations, setEmployeeLocations] = useState<Record<string, string[]>>({});
+  const [locationShifts, setLocationShifts] = useState<Record<string, Record<string, string>>>({});
+  const shiftFor = (emp: any, locationId = activeLocationId) => locationShifts[emp.id]?.[locationId || ''] || emp.shift_type || 'morning';
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>('all');
 
   const filteredEmployees = useMemo(() => {
     if (shiftFilter === 'all') return employees;
-    return employees.filter((emp) => (emp.shift_type || 'morning') === shiftFilter);
-  }, [employees, shiftFilter]);
+    return employees.filter((emp) => shiftFor(emp) === shiftFilter);
+  }, [employees, shiftFilter, locationShifts, activeLocationId]);
 
   const fetchEmployees = async () => {
     setLoading(true);
@@ -89,14 +90,18 @@ const EmployeeManagement: React.FC = () => {
       if (employeeIds.length > 0) {
         const { data: linkData } = await supabase
           .from('employee_locations')
-          .select('employee_id, location_id')
+          .select('employee_id, location_id, shift_type')
           .in('employee_id', employeeIds);
         const map: Record<string, string[]> = {};
+        const shifts: Record<string, Record<string, string>> = {};
         (linkData || []).forEach((row: any) => {
           if (!map[row.employee_id]) map[row.employee_id] = [];
+          if (!shifts[row.employee_id]) shifts[row.employee_id] = {};
+          if (row.shift_type) shifts[row.employee_id][row.location_id] = row.shift_type;
           if (row.location_id) map[row.employee_id].push(row.location_id);
         });
         setEmployeeLocations(map);
+        setLocationShifts(shifts);
       } else {
         setEmployeeLocations({});
       }
@@ -152,18 +157,19 @@ const EmployeeManagement: React.FC = () => {
     try {
       await supabaseService.setEmployeeLocations(empId, next);
     } catch (error) {
-      alert((error as any)?.message || 'Error al actualizar los locales');
+      alert('Error al actualizar los locales');
       fetchEmployees();
     } finally {
       setUpdatingId(null);
     }
   };
 
-  const handleShiftChange = async (empId: string, shiftType: 'morning' | 'afternoon') => {
+  const handleShiftChange = async (empId: string, shiftType: 'morning' | 'afternoon', locationId = activeLocationId) => {
+    if (!locationId) return;
     setUpdatingId(empId);
     try {
-      await supabaseService.updateEmployeeShift(empId, shiftType);
-      setEmployees((prev) => prev.map((emp) => (emp.id === empId ? { ...emp, shift_type: shiftType } : emp)));
+      await supabaseService.updateEmployeeLocationShift(empId, locationId, shiftType);
+      setLocationShifts(prev => ({ ...prev, [empId]: { ...prev[empId], [locationId]: shiftType } }));
     } catch (error) {
       alert('Error al actualizar el turno');
     } finally {
@@ -211,8 +217,8 @@ const EmployeeManagement: React.FC = () => {
           <div className="grid grid-cols-3 gap-2">
             {[
               { value: 'all', label: `Todos (${employees.length})` },
-              { value: 'morning', label: `Manana (${employees.filter((emp) => (emp.shift_type || 'morning') === 'morning').length})` },
-              { value: 'afternoon', label: `Tarde (${employees.filter((emp) => (emp.shift_type || 'morning') === 'afternoon').length})` }
+              { value: 'morning', label: `Manana (${employees.filter((emp) => shiftFor(emp) === 'morning').length})` },
+              { value: 'afternoon', label: `Tarde (${employees.filter((emp) => shiftFor(emp) === 'afternoon').length})` }
             ].map((filter) => {
               const selected = shiftFilter === filter.value;
               return (
@@ -250,7 +256,7 @@ const EmployeeManagement: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-lg truncate">{emp.name || 'Sin nombre'}</p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{emp.is_active !== false ? 'Activo' : 'Inactivo'}</p>
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">{shiftLabel(emp.shift_type)}</p>
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">{shiftLabel(shiftFor(emp))}</p>
                   </div>
                   <div className="shrink-0 flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${emp.is_active !== false ? 'bg-action-green' : 'bg-gray-300'}`}></div>
@@ -284,33 +290,6 @@ const EmployeeManagement: React.FC = () => {
                   )}
                 </div>
 
-                <WeeklyScheduleEditor employee={emp} locations={locations.filter(loc => (employeeLocations[emp.id] || []).includes(loc.id))} onSaved={schedule => setEmployees(prev => prev.map(row => row.id === emp.id ? { ...row, weekly_schedule: schedule } : row))} />
-
-                <div className="relative mt-2">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Turno</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SHIFTS.map((shift) => {
-                      const selected = (emp.shift_type || 'morning') === shift.value;
-                      return (
-                        <button
-                          key={shift.value}
-                          type="button"
-                          disabled={updatingId === emp.id}
-                          onClick={() => handleShiftChange(emp.id, shift.value)}
-                          className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-colors ${selected ? 'bg-primary text-white border-primary' : 'bg-gray-50 dark:bg-black/20 border-gray-200 text-gray-500'}`}
-                        >
-                          {shift.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {updatingId === emp.id && (
-                    <div className="absolute inset-0 bg-white/50 dark:bg-black/50 flex items-center justify-center rounded-xl">
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  )}
-                </div>
-
                 <div className="relative mt-2">
                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Locales</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -329,6 +308,12 @@ const EmployeeManagement: React.FC = () => {
                       );
                     })}
                   </div>
+                  {(employeeLocations[emp.id] || []).map(id => <label key={id} className="flex items-center justify-between gap-2 mt-3 text-xs font-bold">
+                    {locations.find(loc => loc.id === id)?.name}
+                    <select aria-label={`Turno de ${emp.name} en ${locations.find(loc => loc.id === id)?.name}`} value={shiftFor(emp, id)} disabled={updatingId === emp.id} onChange={e => handleShiftChange(emp.id, e.target.value as 'morning' | 'afternoon', id)} className="p-2 rounded-xl bg-gray-50 dark:bg-black/20">
+                      <option value="morning">Mañana</option><option value="afternoon">Tarde</option>
+                    </select>
+                  </label>)}
                   {locations.length === 0 && (
                     <div className="text-xs font-bold text-gray-400">Sin locales disponibles</div>
                   )}

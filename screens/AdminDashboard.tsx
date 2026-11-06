@@ -12,6 +12,7 @@ type ActiveSession = {
   id: string;
   user_id: string;
   clock_in: string;
+  shift_type?: string | null;
 };
 
 const shiftLabel = (value?: string | null) => {
@@ -101,7 +102,7 @@ const AdminDashboard: React.FC = () => {
             : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
           supabase
             .from('sessions')
-            .select('id, user_id, clock_in')
+            .select('id, user_id, clock_in, shift_type')
             .eq('status', 'open')
             .eq('location_id', locationId)
         ]);
@@ -112,7 +113,8 @@ const AdminDashboard: React.FC = () => {
       const totalCount = employeesData?.length || 0;
       const activeCount = activeData?.length || 0;
 
-      setEmployees(employeesData || []);
+      const { data: links } = await supabase.from('employee_locations').select('employee_id, shift_type').eq('location_id', locationId);
+      setEmployees((employeesData || []).map(emp => ({ ...emp, shift_type: links?.find(link => link.employee_id === emp.id)?.shift_type || emp.shift_type })));
       setActiveSessions(activeData || []);
       setStats({ active: activeCount, total: totalCount });
     } catch (error) {
@@ -243,7 +245,7 @@ const AdminDashboard: React.FC = () => {
                       {employeeMap.get(session.user_id)?.name || 'Sin nombre'}
                     </span>
                     <span className="text-[10px] font-bold text-primary uppercase tracking-widest">
-                      {shiftLabel(employeeMap.get(session.user_id)?.shift_type)}
+                      {shiftLabel(session.shift_type || employeeMap.get(session.user_id)?.shift_type)}
                     </span>
                   </div>
                   <span className="text-xs font-bold text-gray-400">

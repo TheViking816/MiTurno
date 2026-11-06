@@ -23,7 +23,6 @@ const App: React.FC = () => {
   const [initialized, setInitialized] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [employeeLocations, setEmployeeLocations] = useState<string[]>([]);
-  const [employeeShift, setEmployeeShift] = useState<'morning' | 'afternoon' | null>(null);
 
   // Email exacto proporcionado para acceso de gestión
   const ADMIN_EMAIL = 'brutal.soul.25@gmail.com';
@@ -57,14 +56,13 @@ const App: React.FC = () => {
     const fetchEmployeeLocation = async () => {
       if (!session?.user?.id) {
         setEmployeeLocations([]);
-        setEmployeeShift(null);
         return;
       }
 
       const [{ data: locationData }, { data: employeeData }] = await Promise.all([
         supabase
           .from('employee_locations')
-          .select('locations(name)')
+          .select('shift_type, locations(name)')
           .eq('employee_id', session.user.id),
         supabase
           .from('employees')
@@ -74,10 +72,9 @@ const App: React.FC = () => {
       ]);
 
       const locationNames = (locationData || [])
-        .map((row: any) => row.locations?.name)
+        .map((row: any) => row.locations?.name ? `${row.locations.name} · ${(row.shift_type || employeeData?.shift_type) === 'afternoon' ? 'Tarde' : 'Mañana'}` : null)
         .filter(Boolean);
       setEmployeeLocations(locationNames);
-      setEmployeeShift(employeeData?.shift_type || null);
     };
 
     fetchEmployeeLocation();
@@ -129,19 +126,11 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-card border border-gray-100 dark:border-gray-800 mb-6">
-                    <p className="text-xs font-bold text-gray-400 uppercase mb-1">Local Asignado</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase mb-1">Locales y turnos</p>
                     <p className="font-black text-lg">
                       {employeeLocations.length > 0 ? employeeLocations.join(', ') : 'Sin asignar'}
                     </p>
                     <p className="text-[10px] font-bold text-gray-400 uppercase mt-2">Solo lectura</p>
-                  </div>
-
-                  <div className="bg-white dark:bg-surface-dark p-6 rounded-3xl shadow-card border border-gray-100 dark:border-gray-800 mb-6">
-                    <p className="text-xs font-bold text-gray-400 uppercase mb-1">Turno</p>
-                    <p className="font-black text-lg">
-                      {employeeShift === 'afternoon' ? 'Tarde' : 'Manana'}
-                    </p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mt-2">Configurable por administracion</p>
                   </div>
 
                   {isAdmin && (

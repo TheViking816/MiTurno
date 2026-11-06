@@ -1,6 +1,5 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { validateScheduledEntry, type WeeklySchedule } from './weeklySchedule';
 
 const SUPABASE_URL = 'https://jskngeempmmrtgohijhy.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impza25nZWVtcG1tcnRnb2hpamh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg4Njg5MTIsImV4cCI6MjA4NDQ0NDkxMn0.JT5f0d3FW5XkyazU1Hu-Cazk2AS5JRaZEmrXjG0ei2o';
@@ -41,12 +40,13 @@ export const supabaseService = {
   getEmployeeLocations: async (userId: string) => {
     const { data, error } = await supabase
       .from('employee_locations')
-      .select('location_id, locations(name)')
+      .select('location_id, shift_type, locations(name)')
       .eq('employee_id', userId);
-    if (error) throw error;
+    if (error) return [];
     return (data || []).map((row: any) => ({
       id: row.location_id,
-      name: row.locations?.name || ''
+      name: row.locations?.name || '',
+      shift_type: row.shift_type as EmployeeShiftType | null
     }));
   },
 
@@ -60,16 +60,8 @@ export const supabaseService = {
   },
 
   setEmployeeLocations: async (userId: string, locationIds: string[]) => {
-    const ids = [...new Set(locationIds)];
-    if (!ids.length) throw new Error('El trabajador debe tener al menos un local.');
-    const { data: employee, error: employeeError } = await supabase.from('employees').select('*').eq('id', userId).single();
-    if (employeeError) throw employeeError;
-    if (employee.weekly_schedule?.some((id: string | null) => id && !ids.includes(id))) {
-      throw new Error('Cambia primero el calendario semanal: todavía contiene ese local.');
-    }
-
-    if (ids.length > 0) {
-      const rows = ids.map((locationId) => ({
+    if (locationIds.length > 0) {
+      const rows = locationIds.map((locationId) => ({
         employee_id: userId,
         location_id: locationId
       }));
@@ -79,24 +71,24 @@ export const supabaseService = {
       if (insertError) throw insertError;
     }
 
-    const primaryLocation = ids[0];
+    const primaryLocation = locationIds[0] || null;
     const { error: updateError } = await supabase
       .from('employees')
       .update({ location_id: primaryLocation })
       .eq('id', userId);
     if (updateError) throw updateError;
-    // Remove only obsolete links after the new links and primary location are saved.
-    const { error: deleteError } = await supabase.from('employee_locations').delete()
-      .eq('employee_id', userId).not('location_id', 'in', `(${ids.join(',')})`);
+    const obsolete = supabase.from('employee_locations').delete().eq('employee_id', userId);
+    const { error: deleteError } = locationIds.length
+      ? await obsolete.not('location_id', 'in', `(${locationIds.join(',')})`)
+      : await obsolete;
     if (deleteError) throw deleteError;
+
   },
 
-  saveWeeklySchedule: async (userId: string, schedule: WeeklySchedule | null) => {
-    const { data, error } = await supabase.from('employees').update({ weekly_schedule: schedule })
-      .eq('id', userId).select('id').single();
-    if (error) throw new Error(error.message.includes('weekly_schedule')
-      ? 'El calendario semanal requiere activar la actualización de la base de datos.' : error.message);
-    if (!data) throw new Error('No se pudo guardar el calendario.');
+  updateEmployeeLocationShift: async (employeeId: string, locationId: string, shiftType: EmployeeShiftType) => {
+    const { error } = await supabase.from('employee_locations').update({ shift_type: shiftType })
+      .eq('employee_id', employeeId).eq('location_id', locationId).select('employee_id').single();
+    if (error) throw error;
   },
 
   getEmployeeIdsByLocation: async (locationId: string) => {
@@ -155,7 +147,7 @@ export const supabaseService = {
 
   clockIn: async (userId: string, locationId?: string | null) => {
     // Check for an existing open session first to prevent duplicates
-    const { data: existingSession, error: sessionError } = await supabase
+    const { data: existingSession } = await supabase
       .from('sessions')
       .select('*')
       .eq('user_id', userId)
@@ -163,17 +155,9 @@ export const supabaseService = {
       .limit(1)
       .maybeSingle();
 
-    if (sessionError) throw sessionError;
     if (existingSession) {
       return existingSession;
     }
-
-    if (!locationId) throw new Error('Escanea el QR de tu local para fichar.');
-    const locations = await supabaseService.getEmployeeLocations(userId);
-    if (!locations.some((location) => location.id === locationId)) throw new Error('No tienes asignado este local. Consulta con administración.');
-    const { data: profile, error: profileError } = await supabase.from('employees').select('*').eq('id', userId).single();
-    if (profileError) throw profileError;
-    validateScheduledEntry(profile.weekly_schedule, locationId);
 
     const { data, error } = await supabase
       .from('sessions')
