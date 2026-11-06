@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, supabaseService } from '../services/supabaseService';
+import WeeklyScheduleEditor from '../components/WeeklyScheduleEditor';
 
 const ROLES = [
   'Jefe de cocina',
@@ -151,7 +152,7 @@ const EmployeeManagement: React.FC = () => {
     try {
       await supabaseService.setEmployeeLocations(empId, next);
     } catch (error) {
-      alert('Error al actualizar los locales');
+      alert((error as any)?.message || 'Error al actualizar los locales');
       fetchEmployees();
     } finally {
       setUpdatingId(null);
@@ -282,6 +283,8 @@ const EmployeeManagement: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                <WeeklyScheduleEditor employee={emp} locations={locations.filter(loc => (employeeLocations[emp.id] || []).includes(loc.id))} onSaved={schedule => setEmployees(prev => prev.map(row => row.id === emp.id ? { ...row, weekly_schedule: schedule } : row))} />
 
                 <div className="relative mt-2">
                   <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-2 block">Turno</label>

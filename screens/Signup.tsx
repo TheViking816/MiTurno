@@ -59,6 +59,12 @@ const Signup: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    if (locationIds.length === 0) {
+      setError('Selecciona al menos un local.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -71,32 +77,26 @@ const Signup: React.FC = () => {
       if (signUpError) throw signUpError;
 
       if (data.user) {
-        if (locationIds.length === 0) {
-          setError('Selecciona al menos un local.');
-          setLoading(false);
-          return;
-        }
-
         const primaryLocationId = locationIds[0];
         const { error: profileError } = await supabase
           .from('employees')
-          .insert([{
+          .upsert([{
             id: data.user.id,
             name: name,
             role: role,
             shift_type: shiftType,
             location_id: primaryLocationId || null
-          }]);
+          }], { onConflict: 'id' });
 
         if (profileError) throw profileError;
 
         if (locationIds.length > 0) {
           const { error: linkError } = await supabase
             .from('employee_locations')
-            .insert(locationIds.map((locId) => ({
+            .upsert(locationIds.map((locId) => ({
               employee_id: data.user.id,
               location_id: locId
-            })));
+            })), { onConflict: 'employee_id,location_id', ignoreDuplicates: true });
           if (linkError) throw linkError;
         }
 

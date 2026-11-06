@@ -4,6 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { supabase, supabaseService } from '../services/supabaseService';
 import { WorkSession } from '../types';
 import logoUrl from '../assets/logo.png';
+import { WEEK_DAYS, scheduledLocation, type WeeklySchedule } from '../services/weeklySchedule';
 
 type ScanFeedback = {
   title: string;
@@ -21,6 +22,8 @@ const EmployeeMainAction: React.FC = () => {
   const [allowedLocationIds, setAllowedLocationIds] = useState<string[]>([]);
   const [employeeLocations, setEmployeeLocations] = useState<{ id: string; name: string }[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const userRef = useRef<any>(null);
   const sessionRef = useRef<WorkSession | null>(null);
@@ -123,13 +126,14 @@ const EmployeeMainAction: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
+      try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUser(user);
 
         const { data: profile } = await supabase
           .from('employees')
-          .select('id')
+          .select('*')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -142,18 +146,25 @@ const EmployeeMainAction: React.FC = () => {
           }]);
         }
 
+        const session = await supabaseService.getCurrentSession(user.id);
+        setCurrentSession(session);
         const locations = await supabaseService.getEmployeeLocations(user.id);
         const locationIds = locations.map((loc) => loc.id);
         setAllowedLocationIds(locationIds);
         setEmployeeLocations(locations);
-        if (locations.length === 1) {
+        setWeeklySchedule(profile?.weekly_schedule || null);
+        const todayLocation = scheduledLocation(profile?.weekly_schedule);
+        if (todayLocation) {
+          setSelectedLocationId(todayLocation);
+        } else if (locations.length === 1) {
           setSelectedLocationId(locations[0].id);
         }
 
-        const session = await supabaseService.getCurrentSession(user.id);
-        setCurrentSession(session);
       }
-
+      } catch (error) {
+        setLoadError(true);
+        setScanFeedback('No se pudieron cargar tus locales.', 'Recarga la página para volver a intentarlo.');
+      }
       setLoading(false);
     };
     init();
@@ -197,7 +208,7 @@ const EmployeeMainAction: React.FC = () => {
             }
 
             const allowedIds = allowedLocationsRef.current || [];
-            if (allowedIds.length > 0 && !allowedIds.includes(location.id)) {
+            if (!allowedIds.includes(location.id)) {
               setScanFeedback('Este QR no corresponde a tus locales asignados.', 'Consulta con administracion si te falta acceso al local correcto.');
               isProcessing = false;
               return;
@@ -218,7 +229,7 @@ const EmployeeMainAction: React.FC = () => {
               navigate('/clock-confirm', { state: { type: 'IN' } });
             } catch (error) {
               console.error('Error al fichar:', error);
-              alert('Error al registrar: Asegurate de tener conexion.');
+              setScanFeedback('No se pudo registrar la entrada.', (error as any)?.message || 'Revisa tu conexión y vuelve a intentarlo.');
               isProcessing = false;
             }
           },
@@ -282,6 +293,18 @@ const EmployeeMainAction: React.FC = () => {
       return;
     }
 
+    if (loadError) return;
+    if (!employeeLocations.length) {
+      setScanFeedback('No tienes locales asignados.', 'Pide a administración que revise tu asignación.');
+      return;
+    }
+    const todayLocation = scheduledLocation(weeklySchedule);
+    if (todayLocation === null) {
+      setScanFeedback('Hoy tienes día libre.', 'Consulta con administración si hay un cambio de calendario.');
+      return;
+    }
+    if (todayLocation) setSelectedLocationId(todayLocation);
+
     if (employeeLocations.length > 1 && !selectedLocationId) {
       setScanFeedback('Selecciona tu local antes de escanear.');
       return;
@@ -300,7 +323,7 @@ const EmployeeMainAction: React.FC = () => {
   if (loading) return null;
 
   return (
-    <div className="relative flex h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark p-6 pb-24 overflow-hidden">
+    <div className="relative flex min-h-screen w-full flex-col max-w-md mx-auto bg-background-light dark:bg-background-dark p-6 pb-24">
       <header className="flex flex-col items-center justify-center pt-8 z-10">
         <img
           src={logoUrl}
@@ -313,8 +336,14 @@ const EmployeeMainAction: React.FC = () => {
         <div className={`h-1.5 w-16 mt-2 rounded-full shadow-sm ${currentSession ? 'bg-action-green' : 'bg-red-500'}`}></div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center z-10">
-        {employeeLocations.length > 1 && !currentSession && (
+      <main className="flex-1 flex flex-col items-center justify-center z-10 py-6">
+        {weeklySchedule && !currentSession && (
+          <div className="w-full mb-4 p-4 bg-white dark:bg-surface-dark rounded-3xl text-sm">
+            <p className="font-black mb-2">Tu semana</p>
+            {WEEK_DAYS.map((day, index) => <p key={day} className="flex justify-between gap-2 text-xs py-0.5"><span>{day}</span><strong>{weeklySchedule[index] ? employeeLocations.find(loc => loc.id === weeklySchedule[index])?.name || 'Local asignado' : 'Libre'}</strong></p>)}
+          </div>
+        )}
+        {employeeLocations.length > 1 && !currentSession && !weeklySchedule && (
           <div className="w-full mb-4">
             <div className="bg-white dark:bg-surface-dark px-5 py-4 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-card">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Local</p>
@@ -346,7 +375,7 @@ const EmployeeMainAction: React.FC = () => {
         )}
         <button
           onClick={handleClockAction}
-          disabled={clockActionBusy}
+          disabled={clockActionBusy || (loadError && !currentSession)}
           className={`relative w-full aspect-square max-w-[280px] text-white rounded-full flex flex-col items-center justify-center gap-4 shadow-2xl transition-all border-[10px] border-white dark:border-zinc-800 ring-4 active:scale-95 ${currentSession ? 'bg-danger ring-danger/30' : 'bg-action-green ring-action-green/30'}`}
         >
           <span className="material-symbols-outlined text-[90px] font-light">
