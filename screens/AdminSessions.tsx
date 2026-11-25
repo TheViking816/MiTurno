@@ -38,6 +38,7 @@ const AdminSessions: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [sessions, setSessions] = useState<SessionEdit[]>([]);
+  const [historicalEmployees, setHistoricalEmployees] = useState<EmployeeRow[]>([]);
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +64,7 @@ const AdminSessions: React.FC = () => {
     setManualOut(nowLocal);
   }, []);
 
-  const employeeMap = useMemo(() => new Map(employees.map((emp) => [emp.id, emp])), [employees]);
+  const employeeMap = useMemo(() => new Map([...employees, ...historicalEmployees].map((emp) => [emp.id, emp])), [employees, historicalEmployees]);
 
   // Filter sessions by selected employee
   const filteredSessions = useMemo(() => {
@@ -168,25 +169,42 @@ const AdminSessions: React.FC = () => {
       }
 
       const employeeIds = await supabaseService.getEmployeeIdsByLocation(selectedLocation);
-      const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
-        await Promise.all([
-          employeeIds.length
-            ? supabase.from('employees').select('id, name').in('id', employeeIds)
-            : Promise.resolve({ data: [] as EmployeeRow[], error: null }),
-          supabase
-            .from('sessions')
-            .select('id, user_id, clock_in, clock_out, location_id')
-            .lte('clock_in', rangeEndIso)
-            .or(`clock_out.gte.${rangeStartIso},clock_out.is.null`)
-            .eq('location_id', selectedLocation)
-            .order('clock_in', { ascending: false })
-        ]);
-
+      const { data: employeesData, error: employeesError } = employeeIds.length
+        ? await supabase.from('employees').select('id, name').in('id', employeeIds)
+        : { data: [], error: null };
       if (employeesError) throw employeesError;
-      if (sessionsError) throw sessionsError;
 
+      const pageSize = 500;
+      const sessionsData: SessionRow[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('sessions')
+          .select('id, user_id, clock_in, clock_out, location_id')
+          .lte('clock_in', rangeEndIso)
+          .or(`clock_out.gte.${rangeStartIso},clock_out.is.null`)
+          .eq('location_id', selectedLocation)
+          .order('clock_in', { ascending: false })
+          .order('id', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        sessionsData.push(...(data || []));
+        if (!data || data.length < pageSize) break;
+      }
+
+      const assignedIds = new Set(employeeIds);
+      const historicalIds = [...new Set(sessionsData.map(session => session.user_id))]
+        .filter(id => !assignedIds.has(id));
+      const historical: EmployeeRow[] = [];
+      for (let offset = 0; offset < historicalIds.length; offset += 100) {
+        const { data, error } = await supabase.from('employees').select('id, name')
+          .in('id', historicalIds.slice(offset, offset + 100));
+        if (error) throw error;
+        historical.push(...(data || []));
+      }
+
+      setHistoricalEmployees(historical);
       setEmployees(employeesData || []);
-      const mapped = (sessionsData || []).map((session: SessionRow) => ({
+      const mapped = sessionsData.map((session: SessionRow) => ({
         ...session,
         clockInLocal: toLocalInput(session.clock_in),
         clockOutLocal: toLocalInput(session.clock_out)
