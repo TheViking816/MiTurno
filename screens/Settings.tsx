@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import jsPDF from 'jspdf';
+import { addShiftBreakNotice } from '../services/pdfFooter';
 import QRCode from 'qrcode';
 import { supabase, supabaseService } from '../services/supabaseService';
 
@@ -126,6 +127,7 @@ const Settings: React.FC = () => {
       doc.setFontSize(10);
       doc.text(qrValue, pageWidth / 2, qrY + qrSize + 30, { align: 'center' });
 
+      addShiftBreakNotice(doc);
       doc.save('qr-fichaje.pdf');
     } catch (err) {
       console.error('Error printing QR:', err);

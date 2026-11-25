@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { addShiftBreakNotice, PDF_FOOTER_MARGIN } from '../services/pdfFooter';
 import { supabase, supabaseService } from '../services/supabaseService';
 
 type Employee = {
@@ -169,6 +170,7 @@ const ExportHours: React.FC = () => {
 
     autoTable(doc, {
       startY: 48,
+      margin: { bottom: PDF_FOOTER_MARGIN },
       head: [['Empleado', 'Rol', 'Total horas']],
       body: totalsByEmployee.length ? totalsByEmployee : [['Sin datos', '-', '0,00h']]
     });
@@ -191,10 +193,12 @@ const ExportHours: React.FC = () => {
 
     autoTable(doc, {
       startY: (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 8 : 60,
+      margin: { bottom: PDF_FOOTER_MARGIN },
       head: [['Empleado', 'Rol', 'Fecha', 'Entrada', 'Salida', 'Horas']],
       body: detailRows.length ? detailRows : [['Sin registros', '-', '-', '-', '-', '0,00h']]
     });
 
+    addShiftBreakNotice(doc);
     doc.save(`reporte-horas-${startDate}-a-${endDate}.pdf`);
   };
 

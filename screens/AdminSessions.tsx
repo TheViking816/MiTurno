@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { addShiftBreakNotice, PDF_FOOTER_MARGIN } from '../services/pdfFooter';
 import { supabase, supabaseService } from '../services/supabaseService';
 
 type EmployeeRow = {
@@ -127,11 +128,13 @@ const AdminSessions: React.FC = () => {
 
     autoTable(doc, {
       startY: selectedEmployeeId ? 48 : 40,
+      margin: { bottom: PDF_FOOTER_MARGIN },
       head: [['Empleado', 'Fecha', 'Entrada', 'Salida', 'Horas']],
       body: detailRows.length ? detailRows : [['Sin registros', '-', '-', '-', '0,00h']]
     });
 
     const empName = selectedEmployeeId ? employeeMap.get(selectedEmployeeId)?.name?.replace(/\s+/g, '_') || 'empleado' : 'todos';
+    addShiftBreakNotice(doc);
     doc.save(`fichajes-${empName}-${startDate}-a-${endDate}.pdf`);
   };
 
