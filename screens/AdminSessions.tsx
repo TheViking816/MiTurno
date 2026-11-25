@@ -421,7 +421,7 @@ const AdminSessions: React.FC = () => {
         {/* PDF Export button */}
         <button
           onClick={handleExportPdf}
-          disabled={loading || !startDate || !endDate}
+          disabled={loading || !!error || !startDate || !endDate}
           className="w-full h-14 mt-4 bg-stone-800 dark:bg-stone-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-xl">picture_as_pdf</span>

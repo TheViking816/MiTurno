@@ -82,25 +82,41 @@ const ExportHours: React.FC = () => {
         }
 
         const employeeIds = await supabaseService.getEmployeeIdsByLocation(selectedLocation);
-        const [{ data: employeesData, error: employeesError }, { data: sessionsData, error: sessionsError }] =
-          await Promise.all([
-            employeeIds.length
-              ? supabase.from('employees').select('id, name, role').in('id', employeeIds)
-              : Promise.resolve({ data: [] as Employee[], error: null }),
-            supabase
-              .from('sessions')
-              .select('id, user_id, clock_in, clock_out, status, location_id')
-              .lte('clock_in', rangeEndIso)
-              .or(`clock_out.gte.${rangeStartIso},clock_out.is.null`)
-              .eq('location_id', selectedLocation)
-              .order('clock_in', { ascending: true })
-          ]);
-
+        const { data: employeesData, error: employeesError } = employeeIds.length
+          ? await supabase.from('employees').select('id, name, role').in('id', employeeIds)
+          : { data: [], error: null };
         if (employeesError) throw employeesError;
-        if (sessionsError) throw sessionsError;
 
-        setEmployees(employeesData || []);
-        setSessions(sessionsData || []);
+        const pageSize = 500;
+        const sessionsData: SessionRow[] = [];
+        for (let offset = 0; ; offset += pageSize) {
+          const { data, error } = await supabase
+            .from('sessions')
+            .select('id, user_id, clock_in, clock_out, status, location_id')
+            .lte('clock_in', rangeEndIso)
+            .or(`clock_out.gte.${rangeStartIso},clock_out.is.null`)
+            .eq('location_id', selectedLocation)
+            .order('clock_in', { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + pageSize - 1);
+          if (error) throw error;
+          sessionsData.push(...(data || []));
+          if (!data || data.length < pageSize) break;
+        }
+
+        const assignedIds = new Set(employeeIds);
+        const historicalIds = [...new Set(sessionsData.map(session => session.user_id))]
+          .filter(id => !assignedIds.has(id));
+        const historical: Employee[] = [];
+        for (let offset = 0; offset < historicalIds.length; offset += 100) {
+          const { data, error } = await supabase.from('employees').select('id, name, role')
+            .in('id', historicalIds.slice(offset, offset + 100));
+          if (error) throw error;
+          historical.push(...(data || []));
+        }
+
+        setEmployees([...(employeesData || []), ...historical]);
+        setSessions(sessionsData);
       } catch (err: any) {
         console.error('Error fetching export data:', err);
         setError('No se pudo cargar la informacion para exportar.');
@@ -202,7 +218,7 @@ const ExportHours: React.FC = () => {
     doc.save(`reporte-horas-${startDate}-a-${endDate}.pdf`);
   };
 
-  const isPdfDisabled = loading || !startDate || !endDate;
+  const isPdfDisabled = loading || !!error || !startDate || !endDate;
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-[#171412] dark:text-[#f5f5f5] font-display h-screen flex flex-col max-w-md mx-auto">
